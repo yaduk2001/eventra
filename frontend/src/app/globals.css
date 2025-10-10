@@ -1,0 +1,94 @@
+@import "tailwindcss";
+
+:root {
+  --background: #ffffff;
+  --foreground: #171717;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+/* Dark mode support */
+.dark {
+  --background: #0a0a0a;
+  --foreground: #ededed;
+}
+
+.dark :root {
+  --background: #0a0a0a;
+  --foreground: #ededed;
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: Arial, Helvetica, sans-serif;
+}
+
+/* Custom utility classes */
+.text-gradient {
+  @apply bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent;
+}
+
+.gradient-primary {
+  @apply bg-gradient-to-r from-indigo-600 to-purple-600;
+}
+
+.btn-primary {
+  @apply bg-gradient-to-r from-indigo-600 to-purple-600 text-white hover:from-indigo-700 hover:to-purple-700 shadow-lg hover:shadow-xl;
+}
+
+.btn-secondary {
+  @apply bg-white text-gray-900 border-2 border-gray-200 hover:bg-gray-50 hover:border-gray-300 shadow-md hover:shadow-lg;
+}
+
+.btn-ghost {
+  @apply text-gray-700 hover:text-gray-900 hover:bg-gray-100;
+}
+
+.card-premium {
+  @apply bg-white border border-gray-200 shadow-lg hover:shadow-xl;
+}
+
+.card-glass {
+  @apply bg-white/10 backdrop-blur-lg border border-white/20 shadow-xl;
+}
+
+.glass {
+  @apply bg-white/10 backdrop-blur-lg border border-white/20;
+}
+
+/* Global input text color fix */
+input[type="text"],
+input[type="email"],
+input[type="password"],
+input[type="number"],
+input[type="tel"],
+input[type="url"],
+input[type="search"],
+input[type="date"],
+input[type="time"],
+input[type="datetime-local"],
+textarea,
+select {
+  @apply text-gray-900 bg-white;
+}
+
+input[type="text"]:focus,
+input[type="email"]:focus,
+input[type="password"]:focus,
+input[type="number"]:focus,
+input[type="tel"]:focus,
+input[type="url"]:focus,
+input[type="search"]:focus,
+input[type="date"]:focus,
+input[type="time"]:focus,
+input[type="datetime-local"]:focus,
+textarea:focus,
+select:focus {
+  @apply text-gray-900 bg-white;
+}
