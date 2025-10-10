@@ -22,34 +22,37 @@ let database;
 try {
   // Check if Firebase is already initialized
   if (admin.apps.length === 0) {
-    // Initialize Firebase Admin with service account (if available)
-    if (process.env.FIREBASE_SERVICE_ACCOUNT_KEY) {
-      const serviceAccount = require(process.env.FIREBASE_SERVICE_ACCOUNT_KEY);
+    // Initialize Firebase Admin with service account credentials from environment variables
+    if (process.env.FIREBASE_PRIVATE_KEY && process.env.FIREBASE_CLIENT_EMAIL) {
+      const serviceAccount = {
+        type: "service_account",
+        project_id: firebaseConfig.projectId,
+        private_key_id: process.env.FIREBASE_PRIVATE_KEY_ID,
+        private_key: process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n'),
+        client_email: process.env.FIREBASE_CLIENT_EMAIL,
+        client_id: process.env.FIREBASE_CLIENT_ID,
+        auth_uri: process.env.FIREBASE_AUTH_URI,
+        token_uri: process.env.FIREBASE_TOKEN_URI,
+        auth_provider_x509_cert_url: process.env.FIREBASE_AUTH_PROVIDER_X509_CERT_URL,
+        client_x509_cert_url: process.env.FIREBASE_CLIENT_X509_CERT_URL,
+        universe_domain: process.env.FIREBASE_UNIVERSE_DOMAIN
+      };
+      
       firebaseApp = admin.initializeApp({
         credential: admin.credential.cert(serviceAccount),
         databaseURL: firebaseConfig.databaseURL,
         storageBucket: firebaseConfig.storageBucket
       });
+      console.log('✅ Using Firebase service account credentials from environment variables');
     } else {
-      // Try to use the service account key file directly
-      try {
-        const serviceAccount = require('../eventra-13b4c-firebase-adminsdk-fbsvc-495d3b360f.json');
-        firebaseApp = admin.initializeApp({
-          credential: admin.credential.cert(serviceAccount),
-          databaseURL: firebaseConfig.databaseURL,
-          storageBucket: firebaseConfig.storageBucket
-        });
-        console.log('✅ Using Firebase service account key');
-      } catch (serviceAccountError) {
-        console.log('Service account key not found, using project ID only');
-        // Initialize with project ID only (for development)
-        // This will use Application Default Credentials (ADC)
-        firebaseApp = admin.initializeApp({
-          projectId: firebaseConfig.projectId,
-          databaseURL: firebaseConfig.databaseURL,
-          storageBucket: firebaseConfig.storageBucket
-        });
-      }
+      console.log('Firebase service account credentials not found in environment variables, using project ID only');
+      // Initialize with project ID only (for development)
+      // This will use Application Default Credentials (ADC)
+      firebaseApp = admin.initializeApp({
+        projectId: firebaseConfig.projectId,
+        databaseURL: firebaseConfig.databaseURL,
+        storageBucket: firebaseConfig.storageBucket
+      });
     }
   } else {
     firebaseApp = admin.app();
