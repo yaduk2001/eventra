@@ -15,6 +15,11 @@ const nextConfig = {
     ignoreDuringBuilds: true,
   },
   
+  // Experimental features
+  experimental: {
+    optimizePackageImports: ['next/font/google'],
+  },
+  
   // Development server security configuration
   allowedDevOrigins: [
     'http://localhost:3000',

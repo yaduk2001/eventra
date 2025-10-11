@@ -1,16 +1,16 @@
-import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import Providers from "../components/providers/Providers";
 
-const geistSans = Geist({
+// Use system fonts instead of Google Fonts to avoid build-time network issues
+const geistSans = {
   variable: "--font-geist-sans",
-  subsets: ["latin"],
-});
+  className: "font-sans",
+};
 
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
-});
+const geistMono = {
+  variable: "--font-geist-mono", 
+  className: "font-mono",
+};
 
 export const metadata = {
   title: "Eventrra",
