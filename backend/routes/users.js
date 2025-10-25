@@ -337,6 +337,71 @@ router.patch('/:userId/approval', verifyToken, requireAdmin, async (req, res) =>
   }
 });
 
+// Get users for messaging (role-based access)
+router.get('/for-messaging', verifyToken, async (req, res) => {
+  try {
+    const currentUserId = req.user.uid;
+    const currentUserRole = req.user.role;
+    
+    // Get all users from Firebase
+    const allUsers = await firebaseHelpers.getCollection('users');
+    
+    // Filter users based on current user role and permissions
+    let filteredUsers = [];
+    
+    if (currentUserRole === 'admin') {
+      // Admin can chat with everyone except themselves
+      filteredUsers = allUsers.filter(u => u.uid !== currentUserId);
+    } else if (currentUserRole === 'customer') {
+      // Customers can only chat with approved service providers
+      filteredUsers = allUsers.filter(u => 
+        ['event_company', 'caterer', 'transport', 'photographer'].includes(u.role) && 
+        u.approved &&
+        u.uid !== currentUserId
+      );
+    } else if (['event_company', 'caterer', 'transport', 'photographer'].includes(currentUserRole)) {
+      // Service providers can chat with customers, job seekers, and freelancers
+      filteredUsers = allUsers.filter(u => 
+        ['customer', 'jobseeker', 'freelancer'].includes(u.role) && 
+        u.uid !== currentUserId
+      );
+    } else if (['jobseeker', 'freelancer'].includes(currentUserRole)) {
+      // Job seekers and freelancers can only see service providers who have contacted them
+      // For now, show all service providers (they can initiate contact)
+      filteredUsers = allUsers.filter(u => 
+        ['event_company', 'caterer', 'transport', 'photographer'].includes(u.role) && 
+        u.approved &&
+        u.uid !== currentUserId
+      );
+    }
+
+    // Format users for frontend
+    const formattedUsers = filteredUsers.map(user => ({
+      id: user.uid,
+      uid: user.uid,
+      name: user.name || user.businessName || user.email,
+      email: user.email,
+      role: user.role,
+      picture: user.picture || null,
+      businessName: user.businessName,
+      approved: user.approved || false,
+      createdAt: user.createdAt
+    }));
+
+    res.json({
+      success: true,
+      data: formattedUsers
+    });
+  } catch (error) {
+    console.error('Get users for messaging error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to get users for messaging',
+      error: error.message
+    });
+  }
+});
+
 // Get user by ID (Admin only)
 router.get('/:userId', verifyToken, requireAdmin, async (req, res) => {
   try {

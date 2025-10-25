@@ -47,6 +47,7 @@ import {
 import PremiumButton from '../../../components/ui/PremiumButton';
 import PremiumCard from '../../../components/ui/PremiumCard';
 import ChatInterface from '../../../components/Chat/ChatInterface';
+import EnhancedMessages from '../../../components/Messages/EnhancedMessages';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '../../../contexts/AuthContext';
@@ -1209,52 +1210,8 @@ const CustomerDashboard = () => {
   );
 
   const renderMessages = () => (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h2 className="text-3xl font-bold text-slate-900">Messages</h2>
-      </div>
-
-      {activeChatRoomId ? (
-        <div className="h-[700px]">
-          <ChatInterface
-            roomId={activeChatRoomId}
-            currentUser={user}
-            onClose={() => setActiveChatRoomId(null)}
-          />
-        </div>
-      ) : (
-        <div className="max-w-2xl mx-auto">
-          <PremiumCard className="p-6">
-            <div className="space-y-4">
-              <h3 className="text-lg font-semibold text-slate-900">Start a Conversation</h3>
-              <p className="text-slate-500">Choose a provider to start chatting.</p>
-              <select
-                className="w-full border border-slate-200 rounded-xl px-4 py-2 bg-white"
-                value={chatPartnerId}
-                onChange={(e) => setChatPartnerId(e.target.value)}
-              >
-                <option value="">Select a provider</option>
-                {providers.map((p) => (
-                  <option key={(p.id || p.uid || p.providerId)} value={(p.id || p.uid || p.providerId)}>
-                    {p.businessName || p.name || p.email || (p.id || p.uid || p.providerId)}
-                  </option>
-                ))}
-              </select>
-              <div className="flex justify-end">
-                <PremiumButton variant="primary" size="md" onClick={handleStartConversation}>
-                  <Plus className="w-5 h-5 mr-2" />
-                  Start Chat
-                </PremiumButton>
-              </div>
-            </div>
-          </PremiumCard>
-
-          <div className="text-center py-16">
-            <MessageCircle className="w-16 h-16 text-slate-400 mx-auto mb-4" />
-            <p className="text-slate-500">You have no active conversations yet.</p>
-          </div>
-        </div>
-      )}
+    <div className="h-[700px]">
+      <EnhancedMessages />
     </div>
   );
 

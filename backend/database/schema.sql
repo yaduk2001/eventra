@@ -289,3 +289,84 @@ INSERT INTO service_areas (name, state, country) VALUES
 ('Ahmedabad', 'Gujarat', 'India'),
 ('Jaipur', 'Rajasthan', 'India'),
 ('Lucknow', 'Uttar Pradesh', 'India');
+
+-- Chat Rooms table (for enhanced messaging)
+CREATE TABLE chat_rooms (
+    id VARCHAR(255) PRIMARY KEY, -- room_uid1_uid2 format
+    type ENUM('direct', 'group') DEFAULT 'direct',
+    participants JSON NOT NULL, -- Array of user IDs
+    created_by VARCHAR(255) NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    last_message_id VARCHAR(255),
+    unread_count JSON, -- {userId: count} format
+    is_active BOOLEAN DEFAULT TRUE,
+    FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE CASCADE,
+    INDEX idx_participants (participants),
+    INDEX idx_created_by (created_by),
+    INDEX idx_updated_at (updated_at)
+);
+
+-- Chat Messages table (for enhanced messaging)
+CREATE TABLE chat_messages (
+    id VARCHAR(255) PRIMARY KEY,
+    room_id VARCHAR(255) NOT NULL,
+    sender_id VARCHAR(255) NOT NULL,
+    sender_name VARCHAR(255) NOT NULL,
+    content TEXT NOT NULL,
+    message_type ENUM('text', 'image', 'video', 'audio', 'file', 'system') DEFAULT 'text',
+    media_url TEXT,
+    metadata JSON, -- Additional message metadata
+    timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    read_by JSON, -- Array of user IDs who have read the message
+    delivered BOOLEAN DEFAULT FALSE,
+    is_edited BOOLEAN DEFAULT FALSE,
+    edited_at TIMESTAMP NULL,
+    reply_to VARCHAR(255), -- ID of message being replied to
+    FOREIGN KEY (room_id) REFERENCES chat_rooms(id) ON DELETE CASCADE,
+    FOREIGN KEY (sender_id) REFERENCES users(id) ON DELETE CASCADE,
+    INDEX idx_room_id (room_id),
+    INDEX idx_sender_id (sender_id),
+    INDEX idx_timestamp (timestamp),
+    INDEX idx_message_type (message_type)
+);
+
+-- Message Reactions table (for enhanced messaging)
+CREATE TABLE message_reactions (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    message_id VARCHAR(255) NOT NULL,
+    user_id VARCHAR(255) NOT NULL,
+    reaction_type ENUM('like', 'love', 'laugh', 'angry', 'sad', 'wow') NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (message_id) REFERENCES chat_messages(id) ON DELETE CASCADE,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    UNIQUE KEY unique_reaction (message_id, user_id),
+    INDEX idx_message_id (message_id),
+    INDEX idx_user_id (user_id)
+);
+
+-- Message Attachments table (for enhanced messaging)
+CREATE TABLE message_attachments (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    message_id VARCHAR(255) NOT NULL,
+    file_name VARCHAR(255) NOT NULL,
+    file_type VARCHAR(100) NOT NULL,
+    file_size INT NOT NULL,
+    file_url TEXT NOT NULL,
+    thumbnail_url TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (message_id) REFERENCES chat_messages(id) ON DELETE CASCADE,
+    INDEX idx_message_id (message_id),
+    INDEX idx_file_type (file_type)
+);
+
+-- User Online Status table (for enhanced messaging)
+CREATE TABLE user_online_status (
+    user_id VARCHAR(255) PRIMARY KEY,
+    is_online BOOLEAN DEFAULT FALSE,
+    last_seen TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    status_message VARCHAR(255),
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    INDEX idx_is_online (is_online),
+    INDEX idx_last_seen (last_seen)
+);

@@ -56,15 +56,34 @@ export const testAuthFlow = {
       return '/auth/login';
     }
 
+    // If no profile, check localStorage for role to determine correct redirect
     if (!userProfile) {
-      console.log('Redirect: /provider/onboarding (no profile)');
-      return '/provider/onboarding';
+      console.log('No profile found, checking localStorage for role...');
+      const roleFromStorage = typeof window !== 'undefined' ? localStorage.getItem('userRole') : null;
+      console.log('Role from localStorage:', roleFromStorage);
+      
+      const providerRoles = ['event_company', 'caterer', 'transport', 'photographer'];
+      
+      // If role is a provider role, redirect to provider onboarding
+      if (roleFromStorage && providerRoles.includes(roleFromStorage)) {
+        console.log('Redirect: /provider/onboarding (provider role in localStorage, no profile)');
+        return '/provider/onboarding';
+      }
+      
+      // For other roles or no role, redirect to appropriate dashboard
+      const redirect = roleFromStorage === 'customer' ? '/customer/dashboard' : 
+                      roleFromStorage === 'freelancer' ? '/freelancer/dashboard' :
+                      roleFromStorage === 'jobseeker' ? '/jobseeker/dashboard' :
+                      roleFromStorage === 'admin' ? '/admin' : '/customer/dashboard';
+      console.log(`Redirect: ${redirect} (no profile, using localStorage role: ${roleFromStorage || 'default customer'})`);
+      return redirect;
     }
 
     const providerRoles = ['event_company', 'caterer', 'transport', 'photographer'];
     if (!providerRoles.includes(userProfile.role)) {
       const redirect = userProfile.role === 'customer' ? '/customer/dashboard' : 
                       userProfile.role === 'freelancer' ? '/freelancer/dashboard' :
+                      userProfile.role === 'jobseeker' ? '/jobseeker/dashboard' :
                       userProfile.role === 'admin' ? '/admin' : '/customer/dashboard';
       console.log(`Redirect: ${redirect} (not a service provider)`);
       return redirect;

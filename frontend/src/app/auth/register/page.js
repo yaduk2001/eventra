@@ -129,10 +129,27 @@ const RegisterPage = () => {
       localStorage.setItem('userRole', role);
       localStorage.setItem('registrationComplete', 'true');
       
-      toast.success('Account created successfully! Please log in to continue.');
+      toast.success('Account created successfully! Redirecting...');
       
-      // Redirect to login page after successful registration
-      window.location.href = '/auth/login';
+      // For service providers, redirect to onboarding directly
+      if (role === 'event_company') {
+        setTimeout(() => {
+          window.location.href = '/provider/onboarding';
+        }, 1000);
+      } else {
+        // For other user types, redirect to their respective dashboards
+        setTimeout(() => {
+          if (role === 'customer') {
+            window.location.href = '/customer/dashboard';
+          } else if (role === 'freelancer') {
+            window.location.href = '/freelancer/dashboard';
+          } else if (role === 'jobseeker') {
+            window.location.href = '/jobseeker/dashboard';
+          } else {
+            window.location.href = '/auth/login';
+          }
+        }, 1000);
+      }
       
     } catch (error) {
       console.error('Registration error:', error);

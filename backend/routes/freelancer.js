@@ -344,4 +344,83 @@ router.get('/search', verifyToken, checkRole(['event_company', 'caterer', 'trans
   }
 });
 
+// Start collaboration (onboarding) for accepted applications
+router.post('/collaborations', verifyToken, checkRole(['freelancer']), async (req, res) => {
+  try {
+    const freelancerId = req.user.uid;
+    const { applicationId } = req.body;
+    
+    // Get the application to verify it's accepted
+    const allApplications = await firebaseHelpers.getCollection('job_applications') || [];
+    const application = allApplications.find(app => app.id === applicationId);
+    
+    if (!application) {
+      return res.status(404).json({
+        success: false,
+        message: 'Application not found'
+      });
+    }
+    
+    if (application.freelancerId !== freelancerId) {
+      return res.status(403).json({
+        success: false,
+        message: 'You can only start collaboration for your own applications'
+      });
+    }
+    
+    if (application.status !== 'accepted') {
+      return res.status(400).json({
+        success: false,
+        message: 'Can only start collaboration for accepted applications'
+      });
+    }
+    
+    // Get job details
+    const job = await firebaseHelpers.getDocument('job_postings', application.jobId);
+    if (!job) {
+      return res.status(404).json({
+        success: false,
+        message: 'Job not found'
+      });
+    }
+    
+    // Create collaboration record
+    const collaborationData = {
+      freelancerId,
+      providerId: job.providerId,
+      jobId: application.jobId,
+      applicationId,
+      status: 'active',
+      startDate: new Date().toISOString(),
+      hourlyRate: job.hourlyRate,
+      monthlyPay: job.monthlyPay,
+      duration: job.duration,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    };
+    
+    const collaboration = await firebaseHelpers.createDocument('collaborations', collaborationData);
+    
+    // Update application status to 'onboarded'
+    await firebaseHelpers.updateDocument('job_applications', applicationId, {
+      status: 'onboarded',
+      collaborationId: collaboration.id,
+      updatedAt: new Date().toISOString()
+    });
+    
+    res.json({
+      success: true,
+      message: 'Collaboration started successfully',
+      data: collaboration
+    });
+  } catch (error) {
+    console.error('Start collaboration error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to start collaboration',
+      error: error.message
+    });
+  }
+});
+
 module.exports = router;

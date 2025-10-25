@@ -3,18 +3,19 @@
 import { motion } from 'framer-motion';
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { 
-  Plus, 
-  Edit, 
-  Trash2, 
-  Eye, 
-  Calendar, 
-  DollarSign, 
-  Users, 
-  Star, 
-  MessageSquare, 
-  Bell, 
-  Settings, 
+import {
+  Plus,
+  Edit,
+  Trash2,
+  Eye,
+  Calendar,
+  DollarSign,
+  Users,
+  Star,
+  MessageSquare,
+  MessageCircle,
+  Bell,
+  Settings,
   Upload,
   MapPin,
   User,
@@ -36,10 +37,14 @@ import {
   UserX,
   X,
   Check,
-  Briefcase
+  Briefcase,
+  RefreshCw
 } from 'lucide-react';
 import PremiumButton from '../../../components/ui/PremiumButton';
 import PremiumCard from '../../../components/ui/PremiumCard';
+import ChatInterface from '../../../components/Chat/ChatInterface';
+import EnhancedMessages from '../../../components/Messages/EnhancedMessages';
+import AIStaffRecommendationModal from '../../../components/ui/AIStaffRecommendationModal';
 import { useAuth } from '../../../contexts/AuthContext';
 import { api } from '../../../lib/api';
 import toast from 'react-hot-toast';
@@ -49,6 +54,12 @@ const ProviderDashboard = () => {
   const [activeTab, setActiveTab] = useState('overview');
   const [dashboardLoading, setDashboardLoading] = useState(true);
   const [profileData, setProfileData] = useState(null);
+
+  // AI Staff Recommendation states
+  const [showAIRecommendationModal, setShowAIRecommendationModal] = useState(false);
+  const [aiRecommendations, setAiRecommendations] = useState([]);
+  const [selectedBooking, setSelectedBooking] = useState(null);
+  const [aiLoading, setAiLoading] = useState(false);
   const [services, setServices] = useState([]);
   const [isEditingProfile, setIsEditingProfile] = useState(false);
   const [editedProfile, setEditedProfile] = useState({});
@@ -84,6 +95,40 @@ const ProviderDashboard = () => {
   const [staffJobApplications, setStaffJobApplications] = useState([]);
   const [showApplicationsModal, setShowApplicationsModal] = useState(false);
   const [isSubmittingStaffJob, setIsSubmittingStaffJob] = useState(false);
+  const [isRefreshingStaffJobs, setIsRefreshingStaffJobs] = useState(false);
+  const [showDeleteConfirmModal, setShowDeleteConfirmModal] = useState(false);
+  const [jobToDelete, setJobToDelete] = useState(null);
+  const [isDeletingJob, setIsDeletingJob] = useState(false);
+
+  // Freelancer job management state
+  const [freelancerJobs, setFreelancerJobs] = useState([]);
+  const [showFreelancerJobModal, setShowFreelancerJobModal] = useState(false);
+  const [freelancerJobForm, setFreelancerJobForm] = useState({
+    title: '',
+    description: '',
+    category: '',
+    location: '',
+    hourlyRate: '',
+    monthlyPay: '',
+    duration: '',
+    requirements: '',
+    startDate: '',
+    endDate: '',
+    startHour: '',
+    endHour: ''
+  });
+  const [isSubmittingFreelancerJob, setIsSubmittingFreelancerJob] = useState(false);
+  const [selectedFreelancerJob, setSelectedFreelancerJob] = useState(null);
+  const [freelancerJobApplications, setFreelancerJobApplications] = useState([]);
+  const [showFreelancerApplicationsModal, setShowFreelancerApplicationsModal] = useState(false);
+  const [isCalculatingEndDate, setIsCalculatingEndDate] = useState(false);
+
+  // Chat state
+  const [chatRooms, setChatRooms] = useState([]);
+  const [availablePartners, setAvailablePartners] = useState([]);
+  const [activeChatRoomId, setActiveChatRoomId] = useState(null);
+  const [loadingChatRooms, setLoadingChatRooms] = useState(false);
+  const [loadingPartners, setLoadingPartners] = useState(false);
   const { user, userProfile, logout, loading: authLoading } = useAuth();
   const router = useRouter();
 
@@ -102,7 +147,7 @@ const ProviderDashboard = () => {
   const handlePostStaffJob = async () => {
     try {
       setIsSubmittingStaffJob(true);
-      
+
       // Validate form
       if (!staffJobForm.jobName || !staffJobForm.dateTime || !staffJobForm.pay || !staffJobForm.spotsNeeded) {
         toast.error('Please fill in all required fields');
@@ -140,7 +185,7 @@ const ProviderDashboard = () => {
 
       // Add to local state
       setStaffJobs(prev => [newJob, ...prev]);
-      
+
       // Reset form and close modal
       setStaffJobForm({
         jobName: '',
@@ -149,7 +194,7 @@ const ProviderDashboard = () => {
         spotsNeeded: 1
       });
       setShowStaffJobModal(false);
-      
+
       toast.success('Staff job posted successfully!');
     } catch (error) {
       console.error('Error posting staff job:', error);
@@ -161,14 +206,18 @@ const ProviderDashboard = () => {
 
   const fetchStaffJobs = async () => {
     try {
+      setIsRefreshingStaffJobs(true);
       const jobs = await api.staffJobs.getMyStaffJobs();
       // Ensure jobs is always an array
       setStaffJobs(Array.isArray(jobs) ? jobs : []);
+      toast.success('Staff jobs refreshed successfully');
     } catch (error) {
       console.error('Error fetching staff jobs:', error);
       toast.error('Failed to load staff jobs');
       // Set to empty array on error
       setStaffJobs([]);
+    } finally {
+      setIsRefreshingStaffJobs(false);
     }
   };
 
@@ -176,13 +225,13 @@ const ProviderDashboard = () => {
     try {
       await api.staffJobs.approveApplication(applicationId);
       toast.success('Application approved! Notification sent to applicant.');
-      
+
       // Refresh applications
       if (selectedStaffJob) {
         const applications = await api.staffJobs.getStaffJobApplications(selectedStaffJob.id);
         setStaffJobApplications(applications);
       }
-      
+
       // Refresh staff jobs to update application counts
       fetchStaffJobs();
     } catch (error) {
@@ -195,13 +244,13 @@ const ProviderDashboard = () => {
     try {
       await api.staffJobs.disapproveApplication(applicationId);
       toast.success('Application rejected.');
-      
+
       // Refresh applications
       if (selectedStaffJob) {
         const applications = await api.staffJobs.getStaffJobApplications(selectedStaffJob.id);
         setStaffJobApplications(applications);
       }
-      
+
       // Refresh staff jobs to update application counts
       fetchStaffJobs();
     } catch (error) {
@@ -249,10 +298,470 @@ const ProviderDashboard = () => {
     }
   };
 
+  const handleDeleteStaffJob = async (job) => {
+    setJobToDelete(job);
+    setShowDeleteConfirmModal(true);
+  };
+
+  const confirmDeleteStaffJob = async () => {
+    if (!jobToDelete) return;
+
+    setIsDeletingJob(true);
+    try {
+      await api.staffJobs.deleteStaffJob(jobToDelete.id);
+
+      // Remove from local state
+      setStaffJobs(prev => prev.filter(job => job.id !== jobToDelete.id));
+
+      setShowDeleteConfirmModal(false);
+      setJobToDelete(null);
+      toast.success('Staff job deleted successfully');
+    } catch (error) {
+      console.error('Error deleting staff job:', error);
+      toast.error('Failed to delete staff job');
+    } finally {
+      setIsDeletingJob(false);
+    }
+  };
+
+  // Freelancer job functions
+  const handlePostFreelancerJob = async () => {
+    try {
+      setIsSubmittingFreelancerJob(true);
+
+      // Validate form
+      if (!freelancerJobForm.title || !freelancerJobForm.description || !freelancerJobForm.category) {
+        toast.error('Please fill in all required fields');
+        return;
+      }
+
+      // Create freelancer job via API
+      console.log('Posting freelancer job with data:', {
+        title: freelancerJobForm.title,
+        description: freelancerJobForm.description,
+        category: freelancerJobForm.category,
+        location: freelancerJobForm.location,
+        hourlyRate: freelancerJobForm.hourlyRate ? parseFloat(freelancerJobForm.hourlyRate) : null,
+        duration: freelancerJobForm.duration,
+        requirements: freelancerJobForm.requirements ? freelancerJobForm.requirements.split(',').map(r => r.trim()) : [],
+        startDate: freelancerJobForm.startDate ? new Date(freelancerJobForm.startDate).toISOString() : null,
+        endDate: freelancerJobForm.endDate ? new Date(freelancerJobForm.endDate).toISOString() : null
+      });
+
+      const response = await api.providerFreelancer.postJob({
+        title: freelancerJobForm.title,
+        description: freelancerJobForm.description,
+        category: freelancerJobForm.category,
+        location: freelancerJobForm.location,
+        hourlyRate: isMonthBasedDuration(freelancerJobForm.duration) ? null : (freelancerJobForm.hourlyRate ? parseFloat(freelancerJobForm.hourlyRate) : null),
+        monthlyPay: isMonthBasedDuration(freelancerJobForm.duration) ? (freelancerJobForm.monthlyPay ? parseFloat(freelancerJobForm.monthlyPay) : null) : null,
+        duration: freelancerJobForm.duration,
+        requirements: freelancerJobForm.requirements ? freelancerJobForm.requirements.split(',').map(r => r.trim()) : [],
+        startDate: freelancerJobForm.startDate ? new Date(freelancerJobForm.startDate).toISOString() : null,
+        endDate: freelancerJobForm.endDate ? new Date(freelancerJobForm.endDate).toISOString() : null,
+        startHour: freelancerJobForm.startHour || null,
+        endHour: freelancerJobForm.endHour || null
+      });
+
+      console.log('API response:', response);
+
+      // Create job object with proper structure
+      const newJob = {
+        id: response.id || Date.now().toString(),
+        title: freelancerJobForm.title,
+        description: freelancerJobForm.description,
+        category: freelancerJobForm.category,
+        location: freelancerJobForm.location,
+        hourlyRate: isMonthBasedDuration(freelancerJobForm.duration) ? null : (freelancerJobForm.hourlyRate ? parseFloat(freelancerJobForm.hourlyRate) : null),
+        monthlyPay: isMonthBasedDuration(freelancerJobForm.duration) ? (freelancerJobForm.monthlyPay ? parseFloat(freelancerJobForm.monthlyPay) : null) : null,
+        duration: freelancerJobForm.duration,
+        requirements: freelancerJobForm.requirements ? freelancerJobForm.requirements.split(',').map(r => r.trim()) : [],
+        startDate: freelancerJobForm.startDate ? new Date(freelancerJobForm.startDate).toISOString() : null,
+        endDate: freelancerJobForm.endDate ? new Date(freelancerJobForm.endDate).toISOString() : null,
+        startHour: freelancerJobForm.startHour || null,
+        endHour: freelancerJobForm.endHour || null,
+        status: 'active',
+        applicationsCount: 0,
+        createdAt: new Date().toISOString()
+      };
+
+      // Add to local state
+      console.log('Adding new job to state:', newJob);
+      setFreelancerJobs(prev => {
+        const updated = [newJob, ...prev];
+        console.log('Updated freelancer jobs:', updated);
+        return updated;
+      });
+
+      // Reset form and close modal
+      setFreelancerJobForm({
+        title: '',
+        description: '',
+        category: '',
+        location: '',
+        hourlyRate: '',
+        monthlyPay: '',
+        duration: '',
+        requirements: '',
+        startDate: '',
+        endDate: '',
+        startHour: '',
+        endHour: ''
+      });
+      setShowFreelancerJobModal(false);
+
+      toast.success('Freelancer job posted successfully!');
+    } catch (error) {
+      console.error('Error posting freelancer job:', error);
+      toast.error('Failed to post freelancer job. Please try again.');
+    } finally {
+      setIsSubmittingFreelancerJob(false);
+    }
+  };
+
+  const fetchFreelancerJobs = async () => {
+    try {
+      const response = await api.providerFreelancer.getJobs();
+      console.log('Freelancer jobs response:', response);
+
+      // Handle different response structures
+      let jobs = [];
+      if (Array.isArray(response)) {
+        jobs = response;
+      } else if (response && Array.isArray(response.data)) {
+        jobs = response.data;
+      } else if (response && response.success && Array.isArray(response.data)) {
+        jobs = response.data;
+      }
+
+      // Ensure each job has required properties
+      const processedJobs = jobs.map((job, index) => ({
+        id: job.id || `job-${index}`,
+        title: job.title || 'Untitled Job',
+        description: job.description || '',
+        category: job.category || 'other',
+        location: job.location || '',
+        hourlyRate: job.hourlyRate || null,
+        duration: job.duration || '',
+        requirements: Array.isArray(job.requirements) ? job.requirements : [],
+        startDate: job.startDate || null,
+        endDate: job.endDate || null,
+        status: job.status || 'active',
+        applicationsCount: job.applicationsCount || 0,
+        createdAt: job.createdAt || new Date().toISOString()
+      }));
+
+      setFreelancerJobs(processedJobs);
+    } catch (error) {
+      console.error('Error fetching freelancer jobs:', error);
+      toast.error('Failed to load freelancer jobs');
+      // Set empty array as fallback
+      setFreelancerJobs([]);
+    }
+  };
+
+  const handleViewFreelancerApplications = async (job) => {
+    try {
+      setSelectedFreelancerJob(job);
+      const applications = await api.providerFreelancer.getJobApplications(job.id);
+      setFreelancerJobApplications(applications);
+      setShowFreelancerApplicationsModal(true);
+    } catch (error) {
+      console.error('Error fetching freelancer applications:', error);
+      toast.error('Failed to load applications');
+    }
+  };
+
+  const handleAcceptFreelancerApplication = async (applicationId) => {
+    try {
+      await api.providerFreelancer.acceptApplication(applicationId);
+      toast.success('Application accepted! Notification sent to freelancer.');
+
+      // Refresh applications
+      if (selectedFreelancerJob) {
+        const applications = await api.providerFreelancer.getJobApplications(selectedFreelancerJob.id);
+        setFreelancerJobApplications(applications);
+      }
+
+      // Refresh jobs
+      fetchFreelancerJobs();
+    } catch (error) {
+      console.error('Error accepting freelancer application:', error);
+      toast.error('Failed to accept application');
+    }
+  };
+
+  const handleRejectFreelancerApplication = async (applicationId) => {
+    try {
+      await api.providerFreelancer.rejectApplication(applicationId, 'Not selected for this project');
+      toast.success('Application rejected.');
+
+      // Refresh applications
+      if (selectedFreelancerJob) {
+        const applications = await api.providerFreelancer.getJobApplications(selectedFreelancerJob.id);
+        setFreelancerJobApplications(applications);
+      }
+
+      // Refresh jobs
+      fetchFreelancerJobs();
+    } catch (error) {
+      console.error('Error rejecting freelancer application:', error);
+      toast.error('Failed to reject application');
+    }
+  };
+
+  const handleDeleteJob = async () => {
+    if (!jobToDelete) return;
+
+    setIsDeletingJob(true);
+    try {
+      console.log('Attempting to delete job:', jobToDelete.id);
+      console.log('API endpoint:', `/provider-freelancer/jobs/${jobToDelete.id}`);
+      console.log('Current user:', user);
+      console.log('User profile:', userProfile);
+
+      // Check if this is a test job or local-only job
+      if (jobToDelete.id.startsWith('test-job-') || jobToDelete.id.startsWith('job-')) {
+        console.log('Deleting local test job, not making API call');
+        // Just remove from local state for test jobs
+        setFreelancerJobs(prev => prev.filter(job => job.id !== jobToDelete.id));
+        setShowDeleteConfirmModal(false);
+        setJobToDelete(null);
+        toast.success('Freelancer job deleted successfully');
+        return;
+      }
+
+      const response = await api.providerFreelancer.deleteJob(jobToDelete.id);
+      console.log('Delete response:', response);
+
+      // Remove from local state
+      setFreelancerJobs(prev => prev.filter(job => job.id !== jobToDelete.id));
+
+      // Close modal and reset state
+      setShowDeleteConfirmModal(false);
+      setJobToDelete(null);
+
+      toast.success('Freelancer job deleted successfully');
+    } catch (error) {
+      console.error('Error deleting freelancer job:', error);
+      console.error('Error details:', {
+        message: error.message,
+        status: error.status,
+        response: error.response
+      });
+
+      // If it's a 404 error, the job might already be deleted, so just remove from local state
+      if (error.status === 404) {
+        console.log('Job not found in database, removing from local state');
+        setFreelancerJobs(prev => prev.filter(job => job.id !== jobToDelete.id));
+        setShowDeleteConfirmModal(false);
+        setJobToDelete(null);
+        toast.success('Freelancer job deleted successfully');
+      } else {
+        toast.error('Failed to delete freelancer job');
+      }
+    } finally {
+      setIsDeletingJob(false);
+    }
+  };
+
+  const confirmDeleteJob = (job) => {
+    setJobToDelete(job);
+    setShowDeleteConfirmModal(true);
+  };
+
+  // Calculate end date and time based on duration, start date, and start hour
+  const calculateEndDateTime = (duration, startDate, startHour) => {
+    if (!duration || !startDate) return { endDate: '', endHour: '' };
+
+    const start = new Date(startDate);
+    if (isNaN(start.getTime())) return { endDate: '', endHour: '' };
+
+    // Parse duration - support formats like "5 days", "8 hours", "2 weeks", etc.
+    const durationStr = duration.toLowerCase().trim();
+    const match = durationStr.match(/(\d+)\s*(day|days|hour|hours|week|weeks|month|months)/);
+
+    if (!match) return { endDate: '', endHour: '' };
+
+    const amount = parseInt(match[1]);
+    const unit = match[2];
+
+    const endDateTime = new Date(start);
+
+    // If start hour is provided, set it
+    if (startHour) {
+      const [hours, minutes] = startHour.split(':').map(Number);
+      endDateTime.setHours(hours, minutes || 0, 0, 0);
+    }
+
+    switch (unit) {
+      case 'hour':
+      case 'hours':
+        endDateTime.setHours(endDateTime.getHours() + amount);
+        break;
+      case 'day':
+      case 'days':
+        endDateTime.setDate(endDateTime.getDate() + amount);
+        break;
+      case 'week':
+      case 'weeks':
+        endDateTime.setDate(endDateTime.getDate() + (amount * 7));
+        break;
+      case 'month':
+      case 'months':
+        endDateTime.setMonth(endDateTime.getMonth() + amount);
+        break;
+      default:
+        return { endDate: '', endHour: '' };
+    }
+
+    const endDate = endDateTime.toISOString().split('T')[0];
+    const endHour = endDateTime.toTimeString().split(' ')[0].substring(0, 5); // HH:MM format
+
+    return { endDate, endHour };
+  };
+
+  // Check if duration is hour-based
+  const isHourBasedDuration = (duration) => {
+    if (!duration) return false;
+    const durationStr = duration.toLowerCase().trim();
+    return durationStr.includes('hour');
+  };
+
+  // Check if duration is month-based
+  const isMonthBasedDuration = (duration) => {
+    if (!duration) return false;
+    const durationStr = duration.toLowerCase().trim();
+    return durationStr.includes('month');
+  };
+
+  // Handle duration change with automatic end date calculation
+  const handleDurationChange = (duration) => {
+    const updatedForm = { ...freelancerJobForm, duration };
+
+    // If start date is set, calculate end date automatically
+    if (freelancerJobForm.startDate) {
+      setIsCalculatingEndDate(true);
+      setTimeout(() => {
+        const calculated = calculateEndDateTime(duration, freelancerJobForm.startDate, freelancerJobForm.startHour);
+        if (calculated.endDate) {
+          updatedForm.endDate = calculated.endDate;
+        }
+        if (calculated.endHour) {
+          updatedForm.endHour = calculated.endHour;
+        }
+        setFreelancerJobForm(updatedForm);
+        setIsCalculatingEndDate(false);
+      }, 100); // Small delay to show calculation state
+    } else {
+      setFreelancerJobForm(updatedForm);
+    }
+  };
+
+  // Handle start date change with automatic end date calculation
+  const handleStartDateChange = (startDate) => {
+    const updatedForm = { ...freelancerJobForm, startDate };
+
+    // If duration is set, calculate end date automatically
+    if (freelancerJobForm.duration) {
+      setIsCalculatingEndDate(true);
+      setTimeout(() => {
+        const calculated = calculateEndDateTime(freelancerJobForm.duration, startDate, freelancerJobForm.startHour);
+        if (calculated.endDate) {
+          updatedForm.endDate = calculated.endDate;
+        }
+        if (calculated.endHour) {
+          updatedForm.endHour = calculated.endHour;
+        }
+        setFreelancerJobForm(updatedForm);
+        setIsCalculatingEndDate(false);
+      }, 100); // Small delay to show calculation state
+    } else {
+      setFreelancerJobForm(updatedForm);
+    }
+  };
+
+  // Handle start hour change with automatic end hour calculation
+  const handleStartHourChange = (startHour) => {
+    const updatedForm = { ...freelancerJobForm, startHour };
+
+    // If duration and start date are set, calculate end date and hour automatically
+    if (freelancerJobForm.duration && freelancerJobForm.startDate) {
+      setIsCalculatingEndDate(true);
+      setTimeout(() => {
+        const calculated = calculateEndDateTime(freelancerJobForm.duration, freelancerJobForm.startDate, startHour);
+        if (calculated.endDate) {
+          updatedForm.endDate = calculated.endDate;
+        }
+        if (calculated.endHour) {
+          updatedForm.endHour = calculated.endHour;
+        }
+        setFreelancerJobForm(updatedForm);
+        setIsCalculatingEndDate(false);
+      }, 100);
+    } else {
+      setFreelancerJobForm(updatedForm);
+    }
+  };
+
+  // Chat functions
+  const loadChatRooms = async () => {
+    try {
+      setLoadingChatRooms(true);
+      const response = await api.getChatRooms();
+      if (response.success) {
+        setChatRooms(response.data || []);
+      }
+    } catch (error) {
+      console.error('Error loading chat rooms:', error);
+      toast.error('Failed to load chat rooms');
+    } finally {
+      setLoadingChatRooms(false);
+    }
+  };
+
+  const loadAvailablePartners = async () => {
+    try {
+      setLoadingPartners(true);
+      console.log('Loading available partners...');
+      const response = await api.getAvailablePartners();
+      console.log('Available partners response:', response);
+
+      if (response.success) {
+        console.log('Setting available partners:', response.data);
+        setAvailablePartners(response.data || []);
+      } else {
+        console.error('Failed to load partners:', response);
+        toast.error(response.message || 'Failed to load available partners');
+      }
+    } catch (error) {
+      console.error('Error loading available partners:', error);
+      toast.error('Failed to load available partners');
+    } finally {
+      setLoadingPartners(false);
+    }
+  };
+
+  const handleStartChat = async (partnerId) => {
+    try {
+      const response = await api.createChatRoom(partnerId);
+      if (response.success) {
+        setActiveChatRoomId(response.data.roomId);
+        await loadChatRooms(); // Refresh chat rooms
+        toast.success('Chat started successfully!');
+      } else {
+        toast.error(response.message || 'Failed to start chat');
+      }
+    } catch (error) {
+      console.error('Error starting chat:', error);
+      toast.error('Failed to start chat');
+    }
+  };
+
   // Persist active tab across page reloads
   useEffect(() => {
     const savedTab = localStorage.getItem('providerDashboardActiveTab');
-    if (savedTab && ['overview', 'services', 'profile', 'hire-staff', 'bookings', 'messages', 'notifications'].includes(savedTab)) {
+    if (savedTab && ['overview', 'services', 'profile', 'hire-staff', 'hire-freelancers', 'bookings', 'messages', 'notifications'].includes(savedTab)) {
       setActiveTab(savedTab);
     }
   }, []);
@@ -265,7 +774,7 @@ const ProviderDashboard = () => {
   // Check if user is authenticated and profile is complete
   useEffect(() => {
     let timeoutId = null;
-    
+
     const checkProfileAndRedirect = async () => {
       // Wait for auth context to initialize
       if (authLoading) {
@@ -287,12 +796,12 @@ const ProviderDashboard = () => {
       if (userProfile === null) {
         console.log('User authenticated but profile not loaded yet, waiting...');
         setDashboardLoading(true);
-        
+
         // Clear any existing timeout
         if (timeoutId) {
           clearTimeout(timeoutId);
         }
-        
+
         // Set a timeout to prevent infinite loading
         timeoutId = setTimeout(() => {
           if (userProfile === null) {
@@ -310,7 +819,7 @@ const ProviderDashboard = () => {
       }
 
       console.log('User profile found:', userProfile);
-      
+
       // Debug the authentication flow
       const debugResult = debugAuthFlow(user, userProfile, 'ProviderDashboard');
       console.log('Debug result:', debugResult);
@@ -345,7 +854,7 @@ const ProviderDashboard = () => {
     };
 
     checkProfileAndRedirect();
-    
+
     // Cleanup timeout on unmount
     return () => {
       if (timeoutId) {
@@ -361,6 +870,11 @@ const ProviderDashboard = () => {
       loadBidRequests();
       loadBookings();
       fetchStaffJobs();
+      console.log('Initial load - fetching freelancer jobs...');
+      fetchFreelancerJobs();
+      // Load chat data
+      loadChatRooms();
+      loadAvailablePartners();
       setEditedProfile({
         businessName: profileData.businessName || '',
         description: profileData.description || '',
@@ -423,7 +937,7 @@ const ProviderDashboard = () => {
 
       await api.services.createService(serviceData);
       toast.success('Service added successfully!');
-      
+
       // Close modal and reset form state
       setShowAddServiceModal(false);
       setEditingService(null);
@@ -456,7 +970,7 @@ const ProviderDashboard = () => {
 
       await api.services.updateService(editingService.id, serviceData);
       toast.success('Service updated successfully!');
-      
+
       // Close modal and reset form state
       setShowAddServiceModal(false);
       setEditingService(null);
@@ -559,7 +1073,7 @@ const ProviderDashboard = () => {
       }
 
       setIsUploadingPicture(true);
-      
+
       try {
         // Create FormData for file upload
         const formData = new FormData();
@@ -567,7 +1081,7 @@ const ProviderDashboard = () => {
 
         // Upload to backend
         const response = await api.uploadProfilePicture(formData);
-        
+
         // Update profile data with new picture URL
         setProfileData({ ...profileData, profilePicture: response.profilePictureUrl });
         toast.success('Profile picture updated successfully!');
@@ -631,12 +1145,12 @@ const ProviderDashboard = () => {
         price: parseFloat(bidForm.price),
         description: bidForm.description || `I would like to provide ${selectedBidRequest.eventType} services for your event. I have experience in this field and can deliver quality service within your requirements.`
       });
-      
+
       toast.success('Bid submitted successfully!');
       setShowBidModal(false);
       setBidForm({ price: '', description: '' });
       setSelectedBidRequest(null);
-      
+
       // Refresh bid requests to show updated status
       loadBidRequests();
     } catch (error) {
@@ -651,6 +1165,115 @@ const ProviderDashboard = () => {
     setShowBidModal(false);
     setBidForm({ price: '', description: '' });
     setSelectedBidRequest(null);
+  };
+
+  // AI Staff Recommendation functions
+  const handleAIStaffRecommendation = async (bookingId) => {
+    try {
+      setAiLoading(true);
+      setSelectedBooking(bookings.find(b => b.id === bookingId));
+      setShowAIRecommendationModal(true);
+
+      const response = await api.staffJobs.getAIRecommendations(bookingId);
+
+      if (response.success) {
+        console.log('AI Recommendations received:', response.data.recommendations);
+        setAiRecommendations(response.data.recommendations);
+        setSelectedBooking(response.data.booking);
+
+        // Show info message if using fallback recommendations
+        if (response.data.isFallback) {
+          toast.info('Using standard recommendations (AI service not available)');
+        }
+      } else {
+        toast.error(response.message || 'Failed to get AI recommendations');
+        setShowAIRecommendationModal(false);
+      }
+    } catch (error) {
+      console.error('AI recommendation error:', error);
+
+      // Provide more specific error messages
+      let errorMessage = 'Failed to get AI recommendations';
+      if (error.message && error.message.includes('Google AI API key')) {
+        errorMessage = 'AI service is not configured. Please contact support.';
+      } else if (error.message && error.message.includes('Unable to connect')) {
+        errorMessage = 'Unable to connect to server. Please check your connection.';
+      } else if (error.status === 500) {
+        errorMessage = 'Server error occurred. Please try again later.';
+      }
+
+      toast.error(errorMessage);
+      setShowAIRecommendationModal(false);
+    } finally {
+      setAiLoading(false);
+    }
+  };
+
+  const handleApproveRecommendations = async (recommendations) => {
+    try {
+      const response = await api.staffJobs.bulkCreateJobs(recommendations);
+      console.log('Bulk create response:', response);
+
+      if (response.success) {
+        // Handle different response structures
+        let staffJobs = [];
+        let freelancerJobs = [];
+        let total = 0;
+
+        if (response.data) {
+          // New structure with separate arrays
+          if (response.data.staffJobs && response.data.freelancerJobs) {
+            staffJobs = response.data.staffJobs || [];
+            freelancerJobs = response.data.freelancerJobs || [];
+            total = response.data.total || (staffJobs.length + freelancerJobs.length);
+          }
+          // Legacy structure (array of jobs)
+          else if (Array.isArray(response.data)) {
+            // Count by job type
+            staffJobs = response.data.filter(job => job.jobName || job.jobType === 'staff' || !job.jobType);
+            freelancerJobs = response.data.filter(job => job.jobType === 'freelancer');
+            total = response.data.length;
+          }
+          // Fallback
+          else {
+            total = response.data.length || 0;
+            staffJobs = response.data || [];
+          }
+        }
+
+        // Show detailed success message
+        let message = `${total} jobs created successfully!`;
+        if (staffJobs.length > 0 && freelancerJobs.length > 0) {
+          message = `${staffJobs.length} staff jobs and ${freelancerJobs.length} freelancer jobs created!`;
+        } else if (staffJobs.length > 0) {
+          message = `${staffJobs.length} staff jobs created!`;
+        } else if (freelancerJobs.length > 0) {
+          message = `${freelancerJobs.length} freelancer jobs created!`;
+        }
+
+        toast.success(message, {
+          duration: 4000,
+          style: {
+            background: '#10B981',
+            color: 'white',
+            fontSize: '14px',
+            fontWeight: '500'
+          }
+        });
+
+        setShowAIRecommendationModal(false);
+        setAiRecommendations([]);
+        setSelectedBooking(null);
+
+        // Navigate to hire staff tab
+        setActiveTab('hire-staff');
+      } else {
+        toast.error(response.message || 'Failed to create jobs');
+      }
+    } catch (error) {
+      console.error('Approve recommendations error:', error);
+      toast.error('Failed to create jobs');
+    }
   };
 
   // Show loading state
@@ -755,11 +1378,10 @@ const ProviderDashboard = () => {
                 </div>
                 <div className="text-right">
                   <p className="font-bold text-gray-900">{booking.amount || booking.totalAmount}</p>
-                  <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                    booking.status === 'confirmed' ? 'bg-green-100 text-green-700' :
+                  <span className={`px-2 py-1 rounded-full text-xs font-medium ${booking.status === 'confirmed' ? 'bg-green-100 text-green-700' :
                     booking.status === 'pending' ? 'bg-yellow-100 text-yellow-700' :
-                    'bg-gray-100 text-gray-700'
-                  }`}>
+                      'bg-gray-100 text-gray-700'
+                    }`}>
                     {booking.status}
                   </span>
                 </div>
@@ -822,13 +1444,13 @@ const ProviderDashboard = () => {
                   </div>
                 </div>
                 <div className="flex items-center space-x-2">
-                  <button 
+                  <button
                     onClick={() => openEditService(service)}
                     className="p-2 text-gray-400 hover:text-gray-600 transition-colors"
                   >
                     <Edit className="w-4 h-4" />
                   </button>
-                  <button 
+                  <button
                     onClick={() => handleDeleteService(service.id)}
                     className="p-2 text-gray-400 hover:text-red-600 transition-colors"
                   >
@@ -837,9 +1459,8 @@ const ProviderDashboard = () => {
                 </div>
               </div>
               <div className="flex items-center justify-between">
-                <span className={`px-3 py-1 rounded-full text-sm font-medium ${
-                  service.isActive !== false ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-700'
-                }`}>
+                <span className={`px-3 py-1 rounded-full text-sm font-medium ${service.isActive !== false ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-700'
+                  }`}>
                   {service.isActive !== false ? 'Active' : 'Inactive'}
                 </span>
                 <PremiumButton variant="ghost" size="sm">
@@ -909,10 +1530,10 @@ const ProviderDashboard = () => {
             <p className="text-gray-900 font-semibold">{profileData?.businessName || profileData?.name || 'Service Provider'}</p>
             <p className="text-gray-600 text-sm">Profile picture from your account</p>
             {isEditingProfile && (
-              <PremiumButton 
-                variant="ghost" 
-                size="sm" 
-                className="mt-2" 
+              <PremiumButton
+                variant="ghost"
+                size="sm"
+                className="mt-2"
                 onClick={handleProfilePictureUpload}
                 disabled={isUploadingPicture}
               >
@@ -934,7 +1555,7 @@ const ProviderDashboard = () => {
                 <input
                   type="text"
                   value={editedProfile.businessName}
-                  onChange={(e) => setEditedProfile({...editedProfile, businessName: e.target.value})}
+                  onChange={(e) => setEditedProfile({ ...editedProfile, businessName: e.target.value })}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 text-gray-900 bg-white"
                 />
               ) : (
@@ -950,7 +1571,7 @@ const ProviderDashboard = () => {
               {isEditingProfile ? (
                 <textarea
                   value={editedProfile.description}
-                  onChange={(e) => setEditedProfile({...editedProfile, description: e.target.value})}
+                  onChange={(e) => setEditedProfile({ ...editedProfile, description: e.target.value })}
                   rows={3}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 text-gray-900 bg-white"
                 />
@@ -964,7 +1585,7 @@ const ProviderDashboard = () => {
                 <input
                   type="text"
                   value={editedProfile.location}
-                  onChange={(e) => setEditedProfile({...editedProfile, location: e.target.value})}
+                  onChange={(e) => setEditedProfile({ ...editedProfile, location: e.target.value })}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 text-gray-900 bg-white"
                   placeholder="City, State"
                 />
@@ -987,7 +1608,7 @@ const ProviderDashboard = () => {
                 <input
                   type="tel"
                   value={editedProfile.phone}
-                  onChange={(e) => setEditedProfile({...editedProfile, phone: e.target.value})}
+                  onChange={(e) => setEditedProfile({ ...editedProfile, phone: e.target.value })}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 text-gray-900 bg-white"
                 />
               ) : (
@@ -1010,7 +1631,7 @@ const ProviderDashboard = () => {
                 <input
                   type="url"
                   value={editedProfile.website}
-                  onChange={(e) => setEditedProfile({...editedProfile, website: e.target.value})}
+                  onChange={(e) => setEditedProfile({ ...editedProfile, website: e.target.value })}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 text-gray-900 bg-white"
                   placeholder="https://yourwebsite.com"
                 />
@@ -1037,8 +1658,8 @@ const ProviderDashboard = () => {
                   type="text"
                   value={editedProfile.socialMedia?.instagram || ''}
                   onChange={(e) => setEditedProfile({
-                    ...editedProfile, 
-                    socialMedia: {...editedProfile.socialMedia, instagram: e.target.value}
+                    ...editedProfile,
+                    socialMedia: { ...editedProfile.socialMedia, instagram: e.target.value }
                   })}
                   className="w-full mt-1 px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-indigo-500 text-gray-900 bg-white"
                   placeholder="@username"
@@ -1057,8 +1678,8 @@ const ProviderDashboard = () => {
                   type="text"
                   value={editedProfile.socialMedia?.facebook || ''}
                   onChange={(e) => setEditedProfile({
-                    ...editedProfile, 
-                    socialMedia: {...editedProfile.socialMedia, facebook: e.target.value}
+                    ...editedProfile,
+                    socialMedia: { ...editedProfile.socialMedia, facebook: e.target.value }
                   })}
                   className="w-full mt-1 px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-indigo-500 text-gray-900 bg-white"
                   placeholder="Page URL"
@@ -1077,8 +1698,8 @@ const ProviderDashboard = () => {
                   type="text"
                   value={editedProfile.socialMedia?.twitter || ''}
                   onChange={(e) => setEditedProfile({
-                    ...editedProfile, 
-                    socialMedia: {...editedProfile.socialMedia, twitter: e.target.value}
+                    ...editedProfile,
+                    socialMedia: { ...editedProfile.socialMedia, twitter: e.target.value }
                   })}
                   className="w-full mt-1 px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-indigo-500 text-gray-900 bg-white"
                   placeholder="@username"
@@ -1097,15 +1718,28 @@ const ProviderDashboard = () => {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h2 className="text-2xl font-bold text-gray-900">Hire Staff</h2>
-        <PremiumButton 
-          variant="primary" 
-          size="lg"
-          onClick={() => setShowStaffJobModal(true)}
-          className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700"
-        >
-          <Plus className="w-5 h-5 mr-2" />
-          Post Job
-        </PremiumButton>
+        <div className="flex items-center gap-3">
+          <PremiumButton
+            variant="ghost"
+            size="lg"
+            onClick={fetchStaffJobs}
+            disabled={isRefreshingStaffJobs}
+            className="text-gray-600 hover:text-gray-900 hover:bg-gray-100 disabled:opacity-50"
+            title="Refresh staff jobs"
+          >
+            <RefreshCw className={`w-5 h-5 mr-2 ${isRefreshingStaffJobs ? 'animate-spin' : ''}`} />
+            {isRefreshingStaffJobs ? 'Refreshing...' : 'Refresh'}
+          </PremiumButton>
+          <PremiumButton
+            variant="primary"
+            size="lg"
+            onClick={() => setShowStaffJobModal(true)}
+            className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700"
+          >
+            <Plus className="w-5 h-5 mr-2" />
+            Post Job
+          </PremiumButton>
+        </div>
       </div>
 
       {/* Staff Jobs List */}
@@ -1115,8 +1749,8 @@ const ProviderDashboard = () => {
             <UserPlus className="w-16 h-16 mx-auto mb-4 text-gray-300" />
             <h3 className="text-lg font-semibold text-gray-900 mb-2">No Staff Jobs Posted</h3>
             <p className="text-gray-600 mb-6">Start hiring staff for your events by posting your first job.</p>
-            <PremiumButton 
-              variant="primary" 
+            <PremiumButton
+              variant="primary"
               onClick={() => setShowStaffJobModal(true)}
               className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700"
             >
@@ -1126,13 +1760,12 @@ const ProviderDashboard = () => {
           </PremiumCard>
         ) : (
           staffJobs.map((job) => (
-            <PremiumCard 
-              key={job.id} 
-              className="p-6 cursor-pointer hover:shadow-lg transition-shadow"
-              onClick={() => handleViewApplications(job)}
+            <PremiumCard
+              key={job.id}
+              className="p-6 hover:shadow-lg transition-shadow"
             >
               <div className="flex items-center justify-between">
-                <div className="flex-1">
+                <div className="flex-1 cursor-pointer" onClick={() => handleViewApplications(job)}>
                   <div className="flex items-center space-x-4">
                     <div className="w-12 h-12 bg-purple-100 rounded-xl flex items-center justify-center">
                       <Briefcase className="w-6 h-6 text-purple-600" />
@@ -1145,16 +1778,28 @@ const ProviderDashboard = () => {
                     </div>
                   </div>
                 </div>
-                <div className="text-right">
-                  <p className="text-lg font-semibold text-gray-900">{job.pay}</p>
-                  <p className="text-sm text-gray-600">
-                    {job.spotsNeeded} spots • {job.spotsApplied || 0} applied
-                  </p>
-                  {job.spotsApproved > 0 && (
-                    <p className="text-sm text-green-600 font-medium">
-                      {job.spotsApproved} approved
+                <div className="flex items-center space-x-4">
+                  <div className="text-right">
+                    <p className="text-lg font-semibold text-gray-900">{job.pay}</p>
+                    <p className="text-sm text-gray-600">
+                      {job.spotsNeeded} spots • {job.spotsApplied || 0} applied
                     </p>
-                  )}
+                    {job.spotsApproved > 0 && (
+                      <p className="text-sm text-green-600 font-medium">
+                        {job.spotsApproved} approved
+                      </p>
+                    )}
+                  </div>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleDeleteStaffJob(job);
+                    }}
+                    className="p-2 text-red-500 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors"
+                    title="Delete job"
+                  >
+                    <Trash2 className="w-5 h-5" />
+                  </button>
                 </div>
               </div>
             </PremiumCard>
@@ -1164,24 +1809,144 @@ const ProviderDashboard = () => {
     </div>
   );
 
+  const renderHireFreelancers = () => {
+    console.log('Rendering hire freelancers, jobs:', freelancerJobs);
+    console.log('Jobs length:', freelancerJobs?.length);
+    console.log('Is array:', Array.isArray(freelancerJobs));
+
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <h2 className="text-2xl font-bold text-gray-900">Hire Freelancers</h2>
+          <PremiumButton
+            variant="primary"
+            size="lg"
+            onClick={() => setShowFreelancerJobModal(true)}
+            className="bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700"
+          >
+            <Plus className="w-5 h-5 mr-2" />
+            Post Freelancer Job
+          </PremiumButton>
+        </div>
+
+        {/* Freelancer Jobs List */}
+        <div className="space-y-4">
+          {!Array.isArray(freelancerJobs) || freelancerJobs.length === 0 ? (
+            <PremiumCard className="p-12 text-center">
+              <UserCheck className="w-16 h-16 mx-auto mb-4 text-gray-300" />
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">No Freelancer Jobs Posted</h3>
+              <p className="text-gray-600 mb-6">Start hiring freelancers for your projects by posting your first job.</p>
+              <PremiumButton
+                variant="primary"
+                onClick={() => setShowFreelancerJobModal(true)}
+                className="bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700"
+              >
+                <Plus className="w-5 h-5 mr-2" />
+                Post Your First Freelancer Job
+              </PremiumButton>
+            </PremiumCard>
+          ) : (
+            freelancerJobs.map((job, index) => {
+              console.log('Rendering job:', job, 'index:', index);
+              return (
+                <PremiumCard
+                  key={job.id || `job-${index}`}
+                  className="p-6 hover:shadow-lg transition-shadow"
+                >
+                  <div className="flex items-start justify-between">
+                    <div
+                      className="flex-1 cursor-pointer"
+                      onClick={() => handleViewFreelancerApplications(job)}
+                    >
+                      <div className="flex items-center space-x-4 mb-3">
+                        <div className="w-12 h-12 bg-green-100 rounded-xl flex items-center justify-center">
+                          <Briefcase className="w-6 h-6 text-green-600" />
+                        </div>
+                        <div>
+                          <h3 className="text-lg font-semibold text-gray-900">{job.title}</h3>
+                          <p className="text-sm text-gray-600">{job.category}</p>
+                        </div>
+                      </div>
+
+                      <p className="text-gray-700 mb-3">{job.description}</p>
+
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm text-gray-600">
+                        {job.location && (
+                          <div className="flex items-center">
+                            <MapPin className="w-4 h-4 mr-1" />
+                            <span>{job.location}</span>
+                          </div>
+                        )}
+                        {(job.hourlyRate || job.monthlyPay) && (
+                          <div className="flex items-center">
+                            <DollarSign className="w-4 h-4 mr-1" />
+                            <span>
+                              {job.monthlyPay
+                                ? `₹${job.monthlyPay}/month`
+                                : `₹${job.hourlyRate}/hr`
+                              }
+                            </span>
+                          </div>
+                        )}
+                        {job.duration && (
+                          <div className="flex items-center">
+                            <Clock className="w-4 h-4 mr-1" />
+                            <span>{job.duration}</span>
+                          </div>
+                        )}
+                        {job.startDate && (
+                          <div className="flex items-center">
+                            <Calendar className="w-4 h-4 mr-1" />
+                            <span>{new Date(job.startDate).toLocaleDateString()}</span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex flex-col items-end ml-4">
+                      <div className="flex items-center space-x-2 mb-2">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            confirmDeleteJob(job);
+                          }}
+                          className="p-2 text-red-500 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors"
+                          title="Delete job"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                      <div className="text-sm text-gray-600 mb-2">
+                        {job.applicationsCount || 0} applications
+                      </div>
+                      <div className={`px-3 py-1 rounded-full text-sm font-medium ${job.status === 'active' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-700'
+                        }`}>
+                        {job.status}
+                      </div>
+                    </div>
+                  </div>
+                </PremiumCard>
+              );
+            })
+          )}
+        </div>
+      </div>
+    );
+  };
+
   const sidebarNavItems = [
     { id: 'overview', label: 'Overview', icon: TrendingUp },
     { id: 'services', label: 'My Services', icon: Settings },
     { id: 'profile', label: 'Profile', icon: Users },
     { id: 'hire-staff', label: 'Hire Staff', icon: UserPlus },
+    { id: 'hire-freelancers', label: 'Hire Freelancers', icon: UserCheck },
     { id: 'bookings', label: 'Bookings', icon: Calendar },
     { id: 'messages', label: 'Messages', icon: MessageSquare },
     { id: 'notifications', label: 'Notifications', icon: Bell }
   ];
 
   const renderMessages = () => (
-    <div className="space-y-6">
-      <h2 className="text-2xl font-bold text-gray-900">Messages</h2>
-      <PremiumCard className="p-12 text-center">
-        <MessageSquare className="w-16 h-16 mx-auto mb-4 text-gray-300" />
-        <h3 className="text-lg font-semibold text-gray-900 mb-2">No Messages</h3>
-        <p className="text-gray-600">You don't have any messages yet. When customers contact you, their messages will appear here.</p>
-      </PremiumCard>
+    <div className="h-[700px]">
+      <EnhancedMessages />
     </div>
   );
 
@@ -1202,74 +1967,74 @@ const ProviderDashboard = () => {
             {bidRequests
               .filter(r => r.hasProviderBid && (r.providerBid?.status === 'pending' || r.status === 'open'))
               .map((request) => (
-              <PremiumCard 
-                key={request.id} 
-                className={`p-6 border-purple-200 bg-purple-50/30`} 
-                hoverEffect="lift"
-              >
-                <div className="flex items-start justify-between">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-3 mb-3">
-                      <div className={`px-3 py-1 rounded-full text-sm font-medium bg-purple-100 text-purple-700`}>
-                        <Clock className="w-3 h-3 mr-1 inline" />
-                        Pending Review
-                      </div>
-                    </div>
-                    
-                    <h4 className="text-lg font-semibold text-gray-900 mb-2">
-                      {request.eventName || `${request.eventType} Event`}
-                    </h4>
-                    
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm text-gray-600 mb-3">
-                      <div className="flex items-center gap-2">
-                        <Calendar className="w-4 h-4" />
-                        <span>{new Date(request.eventDate).toLocaleDateString()}</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <MapPin className="w-4 h-4" />
-                        <span>{request.location}</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <DollarSign className="w-4 h-4" />
-                        <span>₹{request.budget}</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Users className="w-4 h-4" />
-                        <span>{request.guestCount || 'N/A'} guests</span>
-                      </div>
-                    </div>
-
-                    {request.requirements && (
-                      <p className="text-gray-600 text-sm mb-3">
-                        <strong>Requirements:</strong> {request.requirements}
-                      </p>
-                    )}
-
-                    <div className="flex items-center gap-4 text-sm text-gray-500 mb-4">
-                      <span>Customer: {request.customerName}</span>
-                      <span>•</span>
-                      <span>{request.bidCount} bid(s) received</span>
-                      <span>•</span>
-                      <span>Posted {new Date(request.createdAt).toLocaleDateString()}</span>
-                    </div>
-
-                    {request.providerBid && (
-                      <div className="mt-4 p-4 bg-purple-100 rounded-lg border border-purple-200">
-                        <h5 className="font-medium text-purple-900 mb-2 flex items-center">
-                          <CheckCircle className="w-4 h-4 mr-2" />
-                          Your Bid - {request.providerBid.status === 'pending' ? 'Pending Review' : request.providerBid.status}
-                        </h5>
-                        <div className="text-sm text-purple-700 space-y-1">
-                          <p><strong>Price:</strong> ₹{request.providerBid.price?.toLocaleString()}</p>
-                          <p><strong>Description:</strong> {request.providerBid.description}</p>
-                          <p><strong>Submitted:</strong> {new Date(request.providerBid.submittedAt).toLocaleDateString()}</p>
+                <PremiumCard
+                  key={request.id}
+                  className={`p-6 border-purple-200 bg-purple-50/30`}
+                  hoverEffect="lift"
+                >
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-3 mb-3">
+                        <div className={`px-3 py-1 rounded-full text-sm font-medium bg-purple-100 text-purple-700`}>
+                          <Clock className="w-3 h-3 mr-1 inline" />
+                          Pending Review
                         </div>
                       </div>
-                    )}
+
+                      <h4 className="text-lg font-semibold text-gray-900 mb-2">
+                        {request.eventName || `${request.eventType} Event`}
+                      </h4>
+
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm text-gray-600 mb-3">
+                        <div className="flex items-center gap-2">
+                          <Calendar className="w-4 h-4" />
+                          <span>{new Date(request.eventDate).toLocaleDateString()}</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <MapPin className="w-4 h-4" />
+                          <span>{request.location}</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <DollarSign className="w-4 h-4" />
+                          <span>₹{request.budget}</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Users className="w-4 h-4" />
+                          <span>{request.guestCount || 'N/A'} guests</span>
+                        </div>
+                      </div>
+
+                      {request.requirements && (
+                        <p className="text-gray-600 text-sm mb-3">
+                          <strong>Requirements:</strong> {request.requirements}
+                        </p>
+                      )}
+
+                      <div className="flex items-center gap-4 text-sm text-gray-500 mb-4">
+                        <span>Customer: {request.customerName}</span>
+                        <span>•</span>
+                        <span>{request.bidCount} bid(s) received</span>
+                        <span>•</span>
+                        <span>Posted {new Date(request.createdAt).toLocaleDateString()}</span>
+                      </div>
+
+                      {request.providerBid && (
+                        <div className="mt-4 p-4 bg-purple-100 rounded-lg border border-purple-200">
+                          <h5 className="font-medium text-purple-900 mb-2 flex items-center">
+                            <CheckCircle className="w-4 h-4 mr-2" />
+                            Your Bid - {request.providerBid.status === 'pending' ? 'Pending Review' : request.providerBid.status}
+                          </h5>
+                          <div className="text-sm text-purple-700 space-y-1">
+                            <p><strong>Price:</strong> ₹{request.providerBid.price?.toLocaleString()}</p>
+                            <p><strong>Description:</strong> {request.providerBid.description}</p>
+                            <p><strong>Submitted:</strong> {new Date(request.providerBid.submittedAt).toLocaleDateString()}</p>
+                          </div>
+                        </div>
+                      )}
+                    </div>
                   </div>
-                </div>
-              </PremiumCard>
-            ))}
+                </PremiumCard>
+              ))}
           </div>
         ) : (
           <PremiumCard className="p-12 text-center">
@@ -1288,76 +2053,76 @@ const ProviderDashboard = () => {
             {bidRequests
               .filter(r => r.status === 'open' && !r.hasProviderBid)
               .map((request) => (
-              <PremiumCard 
-                key={request.id} 
-                className={`p-6 border-green-200 bg-green-50/30`} 
-                hoverEffect="lift"
-              >
-                <div className="flex items-start justify-between">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-3 mb-3">
-                      <div className={`px-3 py-1 rounded-full text-sm font-medium bg-green-100 text-green-700`}>
-                        Open for Bids
+                <PremiumCard
+                  key={request.id}
+                  className={`p-6 border-green-200 bg-green-50/30`}
+                  hoverEffect="lift"
+                >
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-3 mb-3">
+                        <div className={`px-3 py-1 rounded-full text-sm font-medium bg-green-100 text-green-700`}>
+                          Open for Bids
+                        </div>
+                        <div className="px-3 py-1 rounded-full text-sm font-medium bg-green-100 text-green-700">
+                          <Star className="w-3 h-3 mr-1 inline" />
+                          Available
+                        </div>
                       </div>
-                      <div className="px-3 py-1 rounded-full text-sm font-medium bg-green-100 text-green-700">
-                        <Star className="w-3 h-3 mr-1 inline" />
-                        Available
+
+                      <h4 className="text-lg font-semibold text-gray-900 mb-2">
+                        {request.eventName || `${request.eventType} Event`}
+                      </h4>
+
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm text-gray-600 mb-3">
+                        <div className="flex items-center gap-2">
+                          <Calendar className="w-4 h-4" />
+                          <span>{new Date(request.eventDate).toLocaleDateString()}</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <MapPin className="w-4 h-4" />
+                          <span>{request.location}</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <DollarSign className="w-4 h-4" />
+                          <span>₹{request.budget}</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Users className="w-4 h-4" />
+                          <span>{request.guestCount || 'N/A'} guests</span>
+                        </div>
                       </div>
-                    </div>
-                    
-                    <h4 className="text-lg font-semibold text-gray-900 mb-2">
-                      {request.eventName || `${request.eventType} Event`}
-                    </h4>
-                    
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm text-gray-600 mb-3">
-                      <div className="flex items-center gap-2">
-                        <Calendar className="w-4 h-4" />
-                        <span>{new Date(request.eventDate).toLocaleDateString()}</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <MapPin className="w-4 h-4" />
-                        <span>{request.location}</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <DollarSign className="w-4 h-4" />
-                        <span>₹{request.budget}</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Users className="w-4 h-4" />
-                        <span>{request.guestCount || 'N/A'} guests</span>
+
+                      {request.requirements && (
+                        <p className="text-gray-600 text-sm mb-3">
+                          <strong>Requirements:</strong> {request.requirements}
+                        </p>
+                      )}
+
+                      <div className="flex items-center gap-4 text-sm text-gray-500 mb-4">
+                        <span>Customer: {request.customerName}</span>
+                        <span>•</span>
+                        <span>{request.bidCount} bid(s) received</span>
+                        <span>•</span>
+                        <span>Posted {new Date(request.createdAt).toLocaleDateString()}</span>
                       </div>
                     </div>
 
-                    {request.requirements && (
-                      <p className="text-gray-600 text-sm mb-3">
-                        <strong>Requirements:</strong> {request.requirements}
-                      </p>
-                    )}
-
-                    <div className="flex items-center gap-4 text-sm text-gray-500 mb-4">
-                      <span>Customer: {request.customerName}</span>
-                      <span>•</span>
-                      <span>{request.bidCount} bid(s) received</span>
-                      <span>•</span>
-                      <span>Posted {new Date(request.createdAt).toLocaleDateString()}</span>
+                    {/* Submit Offer Button */}
+                    <div className="ml-6">
+                      <PremiumButton
+                        variant="primary"
+                        size="lg"
+                        onClick={() => handleSubmitOffer(request)}
+                        className="bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white font-semibold px-6 py-3 rounded-xl shadow-lg hover:shadow-xl transition-all duration-200"
+                      >
+                        <DollarSign className="w-5 h-5 mr-2" />
+                        Submit Offer
+                      </PremiumButton>
                     </div>
                   </div>
-                  
-                  {/* Submit Offer Button */}
-                  <div className="ml-6">
-                    <PremiumButton 
-                      variant="primary" 
-                      size="lg"
-                      onClick={() => handleSubmitOffer(request)}
-                      className="bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white font-semibold px-6 py-3 rounded-xl shadow-lg hover:shadow-xl transition-all duration-200"
-                    >
-                      <DollarSign className="w-5 h-5 mr-2" />
-                      Submit Offer
-                    </PremiumButton>
-                  </div>
-                </div>
-              </PremiumCard>
-            ))}
+                </PremiumCard>
+              ))}
           </div>
         ) : (
           <PremiumCard className="p-12 text-center">
@@ -1383,11 +2148,11 @@ const ProviderDashboard = () => {
                         Pending Approval
                       </div>
                     </div>
-                    
+
                     <h4 className="text-lg font-semibold text-gray-900 mb-2">
                       {booking.eventName || booking.serviceName || `${booking.eventType} Event`}
                     </h4>
-                    
+
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm text-gray-600 mb-3">
                       <div className="flex items-center gap-2">
                         <Calendar className="w-4 h-4" />
@@ -1406,7 +2171,7 @@ const ProviderDashboard = () => {
                         <span>{booking.guestCount} guests</span>
                       </div>
                     </div>
-                    
+
                     {booking.requirements && (
                       <div className="mb-3">
                         <p className="text-sm text-gray-600">
@@ -1414,13 +2179,13 @@ const ProviderDashboard = () => {
                         </p>
                       </div>
                     )}
-                    
+
                     <div className="flex items-center gap-2 text-sm text-gray-500">
                       <User className="w-4 h-4" />
                       <span>Customer: {booking.customerName}</span>
                     </div>
                   </div>
-                  
+
                   <div className="flex flex-col gap-2 ml-4">
                     <PremiumButton
                       variant="primary"
@@ -1462,25 +2227,24 @@ const ProviderDashboard = () => {
                 <div className="flex items-start justify-between">
                   <div className="flex-1">
                     <div className="flex items-center gap-3 mb-3">
-                      <div className={`px-3 py-1 rounded-full text-sm font-medium ${
-                        booking.status === 'confirmed' ? 'bg-green-100 text-green-700' :
+                      <div className={`px-3 py-1 rounded-full text-sm font-medium ${booking.status === 'confirmed' ? 'bg-green-100 text-green-700' :
                         booking.status === 'in_progress' ? 'bg-blue-100 text-blue-700' :
-                        booking.status === 'completed' ? 'bg-purple-100 text-purple-700' :
-                        booking.status === 'cancelled' ? 'bg-red-100 text-red-700' :
-                        'bg-gray-100 text-gray-700'
-                      }`}>
+                          booking.status === 'completed' ? 'bg-purple-100 text-purple-700' :
+                            booking.status === 'cancelled' ? 'bg-red-100 text-red-700' :
+                              'bg-gray-100 text-gray-700'
+                        }`}>
                         {booking.status === 'confirmed' ? 'Confirmed' :
-                         booking.status === 'in_progress' ? 'In Progress' :
-                         booking.status === 'completed' ? 'Completed' :
-                         booking.status === 'cancelled' ? 'Cancelled' :
-                         booking.status}
+                          booking.status === 'in_progress' ? 'In Progress' :
+                            booking.status === 'completed' ? 'Completed' :
+                              booking.status === 'cancelled' ? 'Cancelled' :
+                                booking.status}
                       </div>
                     </div>
-                    
+
                     <h4 className="text-lg font-semibold text-gray-900 mb-2">
                       {booking.eventType} Event
                     </h4>
-                    
+
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm text-gray-600 mb-3">
                       <div className="flex items-center gap-2">
                         <Calendar className="w-4 h-4" />
@@ -1509,6 +2273,17 @@ const ProviderDashboard = () => {
                     <div className="flex items-center gap-4 text-sm text-gray-500">
                       <span>Booked {new Date(booking.createdAt).toLocaleDateString()}</span>
                     </div>
+                  </div>
+
+                  {/* Action Buttons */}
+                  <div className="flex flex-col gap-2 mt-4">
+                    <button
+                      className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-lg hover:from-purple-600 hover:to-pink-600 transition-all duration-200 font-medium text-sm"
+                      onClick={() => handleAIStaffRecommendation(booking.id)}
+                    >
+                      <Sparkles className="w-4 h-4" />
+                      AI Staff Recommendation
+                    </button>
                   </div>
                 </div>
               </PremiumCard>
@@ -1546,6 +2321,8 @@ const ProviderDashboard = () => {
         return renderProfile();
       case 'hire-staff':
         return renderHireStaff();
+      case 'hire-freelancers':
+        return renderHireFreelancers();
       case 'bookings':
         return renderBookings();
       case 'messages':
@@ -1581,11 +2358,10 @@ const ProviderDashboard = () => {
               <motion.li key={item.id} whileHover={{ x: 5 }} whileTap={{ scale: 0.98 }}>
                 <button
                   onClick={() => setActiveTab(item.id)}
-                  className={`flex items-center space-x-4 w-full px-4 py-3 rounded-xl transition-all ${
-                    activeTab === item.id
-                      ? 'bg-indigo-100 text-indigo-700 font-semibold shadow-md'
-                      : 'text-gray-700 hover:bg-gray-100'
-                  }`}
+                  className={`flex items-center space-x-4 w-full px-4 py-3 rounded-xl transition-all ${activeTab === item.id
+                    ? 'bg-indigo-100 text-indigo-700 font-semibold shadow-md'
+                    : 'text-gray-700 hover:bg-gray-100'
+                    }`}
                 >
                   <item.icon className="w-5 h-5" />
                   <span>{item.label}</span>
@@ -1611,8 +2387,8 @@ const ProviderDashboard = () => {
             <Settings className="w-5 h-5" />
             <span>Settings</span>
           </PremiumButton>
-          <PremiumButton 
-            variant="ghost" 
+          <PremiumButton
+            variant="ghost"
             className="w-full flex items-center justify-center space-x-2 text-gray-700 hover:bg-gray-100 mt-2"
             onClick={handleLogout}
           >
@@ -1634,13 +2410,13 @@ const ProviderDashboard = () => {
             {activeTab === 'overview' ? 'Dashboard' : activeTab.charAt(0).toUpperCase() + activeTab.slice(1)}
           </h1>
           <p className="text-gray-600">
-            {activeTab === 'overview' ? `Welcome ${userProfile?.name ? userProfile.name.split(' ')[0] : 'back'}! Here's what's happening with your business.` : 
-             activeTab === 'services' ? 'Manage your services and pricing' :
-             activeTab === 'profile' ? 'Update your business information' :
-             activeTab === 'analytics' ? 'View your performance metrics' :
-             activeTab === 'messages' ? 'View and respond to customer messages' :
-             activeTab === 'notifications' ? 'Stay updated with important alerts' :
-             'Manage your business'}
+            {activeTab === 'overview' ? `Welcome ${userProfile?.name ? userProfile.name.split(' ')[0] : 'back'}! Here's what's happening with your business.` :
+              activeTab === 'services' ? 'Manage your services and pricing' :
+                activeTab === 'profile' ? 'Update your business information' :
+                  activeTab === 'analytics' ? 'View your performance metrics' :
+                    activeTab === 'messages' ? 'View and respond to customer messages' :
+                      activeTab === 'notifications' ? 'Stay updated with important alerts' :
+                        'Manage your business'}
           </p>
         </div>
 
@@ -1690,7 +2466,7 @@ const ProviderDashboard = () => {
                 <input
                   type="text"
                   value={serviceForm.name}
-                  onChange={(e) => setServiceForm({...serviceForm, name: e.target.value})}
+                  onChange={(e) => setServiceForm({ ...serviceForm, name: e.target.value })}
                   className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 text-gray-900 bg-white"
                   placeholder="e.g., Wedding Photography"
                   required
@@ -1703,7 +2479,7 @@ const ProviderDashboard = () => {
                 </label>
                 <textarea
                   value={serviceForm.description}
-                  onChange={(e) => setServiceForm({...serviceForm, description: e.target.value})}
+                  onChange={(e) => setServiceForm({ ...serviceForm, description: e.target.value })}
                   rows={4}
                   className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 text-gray-900 bg-white"
                   placeholder="Describe your service in detail..."
@@ -1719,7 +2495,7 @@ const ProviderDashboard = () => {
                   <input
                     type="number"
                     value={serviceForm.price}
-                    onChange={(e) => setServiceForm({...serviceForm, price: e.target.value})}
+                    onChange={(e) => setServiceForm({ ...serviceForm, price: e.target.value })}
                     className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 text-gray-900 bg-white"
                     placeholder="10000"
                     min="0"
@@ -1735,7 +2511,7 @@ const ProviderDashboard = () => {
                   <input
                     type="text"
                     value={serviceForm.duration}
-                    onChange={(e) => setServiceForm({...serviceForm, duration: e.target.value})}
+                    onChange={(e) => setServiceForm({ ...serviceForm, duration: e.target.value })}
                     className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 text-gray-900 bg-white"
                     placeholder="e.g., 8 hours, 2 days"
                   />
@@ -1748,7 +2524,7 @@ const ProviderDashboard = () => {
                 </label>
                 <select
                   value={serviceForm.category}
-                  onChange={(e) => setServiceForm({...serviceForm, category: e.target.value})}
+                  onChange={(e) => setServiceForm({ ...serviceForm, category: e.target.value })}
                   className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 text-gray-900 bg-white"
                 >
                   <option value="">Select a category</option>
@@ -1768,7 +2544,7 @@ const ProviderDashboard = () => {
                   type="checkbox"
                   id="isActive"
                   checked={serviceForm.isActive}
-                  onChange={(e) => setServiceForm({...serviceForm, isActive: e.target.checked})}
+                  onChange={(e) => setServiceForm({ ...serviceForm, isActive: e.target.checked })}
                   className="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
                 />
                 <label htmlFor="isActive" className="text-sm font-medium text-gray-700">
@@ -1869,8 +2645,8 @@ const ProviderDashboard = () => {
                 >
                   Cancel
                 </PremiumButton>
-                <PremiumButton 
-                  type="submit" 
+                <PremiumButton
+                  type="submit"
                   variant="primary"
                   disabled={isSubmittingBid || !bidForm.price}
                   className="bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700"
@@ -1931,7 +2707,7 @@ const ProviderDashboard = () => {
                 <input
                   type="text"
                   value={staffJobForm.jobName}
-                  onChange={(e) => setStaffJobForm({...staffJobForm, jobName: e.target.value})}
+                  onChange={(e) => setStaffJobForm({ ...staffJobForm, jobName: e.target.value })}
                   className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500 text-gray-900 bg-white"
                   placeholder="e.g., Waiter, Sound tech"
                   required
@@ -1945,7 +2721,7 @@ const ProviderDashboard = () => {
                 <input
                   type="datetime-local"
                   value={staffJobForm.dateTime}
-                  onChange={(e) => setStaffJobForm({...staffJobForm, dateTime: e.target.value})}
+                  onChange={(e) => setStaffJobForm({ ...staffJobForm, dateTime: e.target.value })}
                   className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500 text-gray-900 bg-white"
                   required
                 />
@@ -1959,7 +2735,7 @@ const ProviderDashboard = () => {
                 <input
                   type="text"
                   value={staffJobForm.pay}
-                  onChange={(e) => setStaffJobForm({...staffJobForm, pay: e.target.value})}
+                  onChange={(e) => setStaffJobForm({ ...staffJobForm, pay: e.target.value })}
                   className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500 text-gray-900 bg-white"
                   placeholder="e.g., ₹200/hr or ₹1000 flat"
                   required
@@ -1975,7 +2751,7 @@ const ProviderDashboard = () => {
                   min="1"
                   max="50"
                   value={staffJobForm.spotsNeeded}
-                  onChange={(e) => setStaffJobForm({...staffJobForm, spotsNeeded: parseInt(e.target.value)})}
+                  onChange={(e) => setStaffJobForm({ ...staffJobForm, spotsNeeded: parseInt(e.target.value) })}
                   className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500 text-gray-900 bg-white"
                   required
                 />
@@ -1998,8 +2774,8 @@ const ProviderDashboard = () => {
                 >
                   Cancel
                 </PremiumButton>
-                <PremiumButton 
-                  type="submit" 
+                <PremiumButton
+                  type="submit"
                   variant="primary"
                   disabled={isSubmittingStaffJob}
                   className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700"
@@ -2082,7 +2858,7 @@ const ProviderDashboard = () => {
                           <p className="text-xs text-gray-500">Applied {new Date(application.appliedAt).toLocaleDateString()}</p>
                         </div>
                       </div>
-                      
+
                       <div className="flex items-center space-x-2">
                         {application.status === 'pending' ? (
                           <>
@@ -2106,11 +2882,10 @@ const ProviderDashboard = () => {
                             </PremiumButton>
                           </>
                         ) : (
-                          <span className={`px-3 py-1 rounded-full text-sm font-medium ${
-                            application.status === 'approved' 
-                              ? 'bg-green-100 text-green-700' 
-                              : 'bg-red-100 text-red-700'
-                          }`}>
+                          <span className={`px-3 py-1 rounded-full text-sm font-medium ${application.status === 'approved'
+                            ? 'bg-green-100 text-green-700'
+                            : 'bg-red-100 text-red-700'
+                            }`}>
                             {application.status === 'approved' ? 'Approved' : 'Disapproved'}
                           </span>
                         )}
@@ -2123,6 +2898,491 @@ const ProviderDashboard = () => {
           </motion.div>
         </div>
       )}
+
+      {/* Freelancer Job Posting Modal */}
+      {showFreelancerJobModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <motion.div
+            className="bg-white rounded-2xl p-8 max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto"
+            initial={{ scale: 0.9, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            transition={{ duration: 0.2 }}
+          >
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-2xl font-bold text-gray-900">Post Freelancer Job</h2>
+              <button
+                onClick={() => {
+                  setShowFreelancerJobModal(false);
+                  setFreelancerJobForm({
+                    title: '',
+                    description: '',
+                    category: '',
+                    location: '',
+                    hourlyRate: '',
+                    monthlyPay: '',
+                    duration: '',
+                    requirements: '',
+                    startDate: '',
+                    endDate: '',
+                    startHour: '',
+                    endHour: ''
+                  });
+                }}
+                className="text-gray-400 hover:text-gray-600 transition-colors"
+              >
+                <XCircle className="w-6 h-6" />
+              </button>
+            </div>
+
+            <form onSubmit={(e) => {
+              e.preventDefault();
+              handlePostFreelancerJob();
+            }} className="space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    Job Title *
+                  </label>
+                  <input
+                    type="text"
+                    value={freelancerJobForm.title}
+                    onChange={(e) => setFreelancerJobForm({ ...freelancerJobForm, title: e.target.value })}
+                    className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-green-500 text-gray-900 bg-white"
+                    placeholder="e.g., Event Photographer"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    Category *
+                  </label>
+                  <select
+                    value={freelancerJobForm.category}
+                    onChange={(e) => setFreelancerJobForm({ ...freelancerJobForm, category: e.target.value })}
+                    className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-green-500 text-gray-900 bg-white"
+                    required
+                  >
+                    <option value="">Select a category</option>
+                    <option value="photography">Photography</option>
+                    <option value="videography">Videography</option>
+                    <option value="music">Music & Entertainment</option>
+                    <option value="catering">Catering</option>
+                    <option value="decoration">Decoration</option>
+                    <option value="planning">Event Planning</option>
+                    <option value="other">Other</option>
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  Description *
+                </label>
+                <textarea
+                  value={freelancerJobForm.description}
+                  onChange={(e) => setFreelancerJobForm({ ...freelancerJobForm, description: e.target.value })}
+                  rows={4}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-green-500 text-gray-900 bg-white"
+                  placeholder="Describe the job requirements and what you're looking for..."
+                  required
+                />
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    Location
+                  </label>
+                  <input
+                    type="text"
+                    value={freelancerJobForm.location}
+                    onChange={(e) => setFreelancerJobForm({ ...freelancerJobForm, location: e.target.value })}
+                    className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-green-500 text-gray-900 bg-white"
+                    placeholder="e.g., Mumbai, India"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    {isMonthBasedDuration(freelancerJobForm.duration) ? 'Monthly Pay (₹)' : 'Hourly Rate (₹)'}
+                  </label>
+                  <input
+                    type="number"
+                    value={isMonthBasedDuration(freelancerJobForm.duration) ? freelancerJobForm.monthlyPay : freelancerJobForm.hourlyRate}
+                    onChange={(e) => {
+                      if (isMonthBasedDuration(freelancerJobForm.duration)) {
+                        setFreelancerJobForm({ ...freelancerJobForm, monthlyPay: e.target.value });
+                      } else {
+                        setFreelancerJobForm({ ...freelancerJobForm, hourlyRate: e.target.value });
+                      }
+                    }}
+                    className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-green-500 text-gray-900 bg-white"
+                    placeholder={isMonthBasedDuration(freelancerJobForm.duration) ? "e.g., 50000" : "e.g., 2000"}
+                    min="0"
+                    step={isMonthBasedDuration(freelancerJobForm.duration) ? "1000" : "100"}
+                  />
+                  <p className="text-xs text-gray-500 mt-1">
+                    {isMonthBasedDuration(freelancerJobForm.duration)
+                      ? 'Monthly salary for the freelancer'
+                      : 'Rate per hour for the freelancer'
+                    }
+                  </p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    Duration
+                  </label>
+                  <input
+                    type="text"
+                    value={freelancerJobForm.duration}
+                    onChange={(e) => handleDurationChange(e.target.value)}
+                    className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-green-500 text-gray-900 bg-white"
+                    placeholder="e.g., 8 hours, 2 days, 1 week"
+                  />
+                  <p className="text-xs text-gray-500 mt-1">
+                    Supports: hours, days, weeks, months (e.g., "5 days", "8 hours", "2 weeks", "1 month")
+                  </p>
+                  {freelancerJobForm.duration && !calculateEndDateTime(freelancerJobForm.duration, '2024-01-01', '09:00').endDate && (
+                    <p className="text-xs text-red-500 mt-1">
+                      Invalid format. Use formats like "5 days", "8 hours", "2 weeks", "1 month"
+                    </p>
+                  )}
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    Requirements (comma-separated)
+                  </label>
+                  <input
+                    type="text"
+                    value={freelancerJobForm.requirements}
+                    onChange={(e) => setFreelancerJobForm({ ...freelancerJobForm, requirements: e.target.value })}
+                    className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-green-500 text-gray-900 bg-white"
+                    placeholder="e.g., 3+ years experience, DSLR camera"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    Start Date
+                  </label>
+                  <input
+                    type="date"
+                    value={freelancerJobForm.startDate}
+                    onChange={(e) => handleStartDateChange(e.target.value)}
+                    className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-green-500 text-gray-900 bg-white"
+                  />
+                  <p className="text-xs text-gray-500 mt-1">
+                    End date will be calculated automatically if duration is set
+                  </p>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    End Date
+                    {freelancerJobForm.duration && freelancerJobForm.startDate && (
+                      <span className="text-green-600 text-xs ml-2">(Auto-calculated)</span>
+                    )}
+                  </label>
+                  <div className="relative">
+                    <input
+                      type="date"
+                      value={freelancerJobForm.endDate}
+                      onChange={(e) => setFreelancerJobForm({ ...freelancerJobForm, endDate: e.target.value })}
+                      className={`w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-green-500 text-gray-900 bg-white ${freelancerJobForm.duration && freelancerJobForm.startDate ? 'bg-green-50 border-green-200' : ''
+                        }`}
+                    />
+                    {isCalculatingEndDate && (
+                      <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-green-500"></div>
+                      </div>
+                    )}
+                  </div>
+                  <p className="text-xs text-gray-500 mt-1">
+                    {freelancerJobForm.duration && freelancerJobForm.startDate
+                      ? 'Automatically calculated from duration and start date'
+                      : 'Set manually or enter duration + start date for auto-calculation'
+                    }
+                  </p>
+                </div>
+              </div>
+
+              {/* Hour fields - only show for hour-based durations */}
+              {isHourBasedDuration(freelancerJobForm.duration) && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">
+                      Start Time
+                    </label>
+                    <input
+                      type="time"
+                      value={freelancerJobForm.startHour}
+                      onChange={(e) => handleStartHourChange(e.target.value)}
+                      className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-green-500 text-gray-900 bg-white"
+                    />
+                    <p className="text-xs text-gray-500 mt-1">
+                      Set the start time for your job
+                    </p>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">
+                      End Time
+                      {freelancerJobForm.duration && freelancerJobForm.startDate && freelancerJobForm.startHour && (
+                        <span className="text-green-600 text-xs ml-2">(Auto-calculated)</span>
+                      )}
+                    </label>
+                    <div className="relative">
+                      <input
+                        type="time"
+                        value={freelancerJobForm.endHour}
+                        onChange={(e) => setFreelancerJobForm({ ...freelancerJobForm, endHour: e.target.value })}
+                        className={`w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-green-500 text-gray-900 bg-white ${freelancerJobForm.duration && freelancerJobForm.startDate && freelancerJobForm.startHour ? 'bg-green-50 border-green-200' : ''
+                          }`}
+                      />
+                      {isCalculatingEndDate && (
+                        <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
+                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-green-500"></div>
+                        </div>
+                      )}
+                    </div>
+                    <p className="text-xs text-gray-500 mt-1">
+                      {freelancerJobForm.duration && freelancerJobForm.startDate && freelancerJobForm.startHour
+                        ? 'Automatically calculated from duration and start time'
+                        : 'Set manually or enter duration + start time for auto-calculation'
+                      }
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              <div className="flex items-center justify-end space-x-4 pt-6 border-t border-gray-200">
+                <PremiumButton
+                  type="button"
+                  variant="ghost"
+                  onClick={() => {
+                    setShowFreelancerJobModal(false);
+                    setFreelancerJobForm({
+                      title: '',
+                      description: '',
+                      category: '',
+                      location: '',
+                      hourlyRate: '',
+                      monthlyPay: '',
+                      duration: '',
+                      requirements: '',
+                      startDate: '',
+                      endDate: '',
+                      startHour: '',
+                      endHour: ''
+                    });
+                  }}
+                  disabled={isSubmittingFreelancerJob}
+                >
+                  Cancel
+                </PremiumButton>
+                <PremiumButton
+                  type="submit"
+                  variant="primary"
+                  disabled={isSubmittingFreelancerJob}
+                  className="bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700"
+                >
+                  {isSubmittingFreelancerJob ? (
+                    <>
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                      Posting...
+                    </>
+                  ) : (
+                    <>
+                      <Plus className="w-4 h-4 mr-2" />
+                      Post Job
+                    </>
+                  )}
+                </PremiumButton>
+              </div>
+            </form>
+          </motion.div>
+        </div>
+      )}
+
+      {/* Freelancer Applications Modal */}
+      {showFreelancerApplicationsModal && selectedFreelancerJob && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <motion.div
+            className="bg-white rounded-2xl p-8 max-w-2xl w-full mx-4 max-h-[80vh] overflow-y-auto"
+            initial={{ scale: 0.9, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            transition={{ duration: 0.2 }}
+          >
+            <div className="flex items-center justify-between mb-6">
+              <div>
+                <h2 className="text-2xl font-bold text-gray-900">{selectedFreelancerJob.title} - Applications</h2>
+                <p className="text-gray-600">{selectedFreelancerJob.category}</p>
+              </div>
+              <button
+                onClick={() => {
+                  setShowFreelancerApplicationsModal(false);
+                  setSelectedFreelancerJob(null);
+                  setFreelancerJobApplications([]);
+                }}
+                className="text-gray-400 hover:text-gray-600 transition-colors"
+              >
+                <XCircle className="w-6 h-6" />
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              {freelancerJobApplications.length === 0 ? (
+                <div className="text-center py-12">
+                  <Users className="w-16 h-16 mx-auto mb-4 text-gray-300" />
+                  <h3 className="text-lg font-semibold text-gray-900 mb-2">No Applications Yet</h3>
+                  <p className="text-gray-600">Applications will appear here once freelancers apply.</p>
+                </div>
+              ) : (
+                freelancerJobApplications.map((application) => (
+                  <div key={application.id} className="border border-gray-200 rounded-xl p-4">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center space-x-4">
+                        <div className="w-12 h-12 bg-green-100 rounded-xl flex items-center justify-center">
+                          <User className="w-6 h-6 text-green-600" />
+                        </div>
+                        <div>
+                          <h4 className="font-semibold text-gray-900">{application.freelancer?.name || 'Freelancer'}</h4>
+                          {application.freelancer?.email && (
+                            <p className="text-sm text-gray-600 flex items-center">
+                              <Mail className="w-4 h-4 mr-1" />
+                              {application.freelancer.email}
+                            </p>
+                          )}
+                          {application.freelancer?.phone && (
+                            <p className="text-sm text-gray-600 flex items-center">
+                              <Phone className="w-4 h-4 mr-1" />
+                              {application.freelancer.phone}
+                            </p>
+                          )}
+                          <p className="text-xs text-gray-500">Applied {new Date(application.appliedAt).toLocaleDateString()}</p>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center space-x-2">
+                        {application.status === 'pending' ? (
+                          <>
+                            <PremiumButton
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleRejectFreelancerApplication(application.id)}
+                              className="text-red-600 hover:bg-red-50"
+                            >
+                              <UserX className="w-4 h-4 mr-1" />
+                              Reject
+                            </PremiumButton>
+                            <PremiumButton
+                              variant="primary"
+                              size="sm"
+                              onClick={() => handleAcceptFreelancerApplication(application.id)}
+                              className="bg-green-600 hover:bg-green-700"
+                            >
+                              <UserCheck className="w-4 h-4 mr-1" />
+                              Accept
+                            </PremiumButton>
+                          </>
+                        ) : (
+                          <span className={`px-3 py-1 rounded-full text-sm font-medium ${application.status === 'accepted'
+                            ? 'bg-green-100 text-green-700'
+                            : 'bg-red-100 text-red-700'
+                            }`}>
+                            {application.status === 'accepted' ? 'Accepted' : 'Rejected'}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    {application.coverLetter && (
+                      <div className="mt-3 p-3 bg-gray-50 rounded-lg">
+                        <h5 className="font-medium text-gray-900 mb-1">Cover Letter:</h5>
+                        <p className="text-sm text-gray-700">{application.coverLetter}</p>
+                      </div>
+                    )}
+                  </div>
+                ))
+              )}
+            </div>
+          </motion.div>
+        </div>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {showDeleteConfirmModal && jobToDelete && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <motion.div
+            className="bg-white rounded-2xl p-8 max-w-md w-full mx-4"
+            initial={{ scale: 0.9, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            transition={{ duration: 0.2 }}
+          >
+            <div className="text-center">
+              <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <AlertCircle className="w-8 h-8 text-red-600" />
+              </div>
+
+              <h2 className="text-2xl font-bold text-gray-900 mb-2">
+                Delete {jobToDelete.jobName ? 'Staff Job' : 'Freelancer Job'}
+              </h2>
+              <p className="text-gray-600 mb-6">
+                Are you sure you want to delete "<strong>{jobToDelete.jobName || jobToDelete.title}</strong>"?
+                This action cannot be undone and will remove all associated applications.
+              </p>
+
+              <div className="flex space-x-4">
+                <button
+                  onClick={() => {
+                    setShowDeleteConfirmModal(false);
+                    setJobToDelete(null);
+                  }}
+                  className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+                  disabled={isDeletingJob}
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={jobToDelete.jobName ? confirmDeleteStaffJob : handleDeleteJob}
+                  disabled={isDeletingJob}
+                  className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
+                >
+                  {isDeletingJob ? (
+                    <>
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                      Deleting...
+                    </>
+                  ) : (
+                    'Delete Job'
+                  )}
+                </button>
+              </div>
+            </div>
+          </motion.div>
+        </div>
+      )}
+
+      {/* AI Staff Recommendation Modal */}
+      <AIStaffRecommendationModal
+        isOpen={showAIRecommendationModal}
+        onClose={() => {
+          setShowAIRecommendationModal(false);
+          setAiRecommendations([]);
+          setSelectedBooking(null);
+        }}
+        recommendations={aiRecommendations}
+        booking={selectedBooking}
+        onApprove={handleApproveRecommendations}
+        isLoading={aiLoading}
+      />
     </div>
   );
 };
