@@ -2,12 +2,12 @@
 
 import { motion } from 'framer-motion';
 import { useState, useEffect } from 'react';
-import { 
-  Calendar, 
-  Users, 
-  MessageCircle, 
-  Bell, 
-  Settings, 
+import {
+  Calendar,
+  Users,
+  MessageCircle,
+  Bell,
+  Settings,
   Plus,
   TrendingUp,
   Star,
@@ -48,6 +48,7 @@ import PremiumButton from '../../../components/ui/PremiumButton';
 import PremiumCard from '../../../components/ui/PremiumCard';
 import ChatInterface from '../../../components/Chat/ChatInterface';
 import EnhancedMessages from '../../../components/Messages/EnhancedMessages';
+import CertificateTemplate from '../../../components/CertificateTemplate';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '../../../contexts/AuthContext';
@@ -94,7 +95,7 @@ const CustomerDashboard = () => {
   const [categoryFilter, setCategoryFilter] = useState('all');
   const [isBookingInProgress, setIsBookingInProgress] = useState(false);
   const [bookingServiceId, setBookingServiceId] = useState(null);
-  
+
   const { user, userProfile, logout } = useAuth();
   const router = useRouter();
 
@@ -137,6 +138,7 @@ const CustomerDashboard = () => {
     { id: 'providers', label: 'View Providers', icon: Users },
     { id: 'bookings', label: 'My Bookings', icon: Calendar },
     { id: 'messages', label: 'Messages', icon: MessageCircle },
+    { id: 'features', label: 'Features', icon: Award },
     { id: 'notifications', label: 'Notifications', icon: Bell },
     { id: 'settings', label: 'Settings', icon: Settings }
   ];
@@ -189,7 +191,7 @@ const CustomerDashboard = () => {
   const loadData = async () => {
     try {
       setLoading(true);
-      
+
       // Load public data (services and providers) - these should always work
       try {
         const servicesResponse = await api.services.getServices();
@@ -199,7 +201,7 @@ const CustomerDashboard = () => {
         console.error('Error loading services:', error);
         setServices([]);
       }
-      
+
       try {
         const providersResponse = await api.services.getAllProviders();
         console.log('Providers response:', providersResponse);
@@ -208,11 +210,11 @@ const CustomerDashboard = () => {
         console.error('Error loading providers:', error);
         setProviders([]);
       }
-      
+
       // Load user-specific data only if user is authenticated and has a valid token
       let bookingsList = [];
       let bidRequestsList = [];
-      
+
       if (user) {
         try {
           // Verify user has a valid token before making authenticated requests
@@ -222,31 +224,31 @@ const CustomerDashboard = () => {
             try {
               const bookingsResponse = await api.getBookings();
               console.log('Bookings response:', bookingsResponse);
-              
+
               // Merge backend data with local state to preserve optimistic updates
               setBookings(prevBookings => {
                 const backendBookings = bookingsResponse.data || [];
-                
+
                 // Create a map of backend bookings for quick lookup
                 const backendBookingsMap = new Map();
                 backendBookings.forEach(booking => {
                   backendBookingsMap.set(booking.id, booking);
                 });
-                
+
                 // Merge local and backend bookings
                 const mergedBookings = [...backendBookings];
                 console.log('Backend bookings count:', backendBookings.length);
                 console.log('Previous bookings count:', prevBookings.length);
-                
+
                 // Add any local bookings that aren't in backend yet (optimistic updates)
                 prevBookings.forEach(localBooking => {
                   if (!backendBookingsMap.has(localBooking.id)) {
                     // Check if there's a backend booking for the same service (different ID)
-                    const backendBookingForService = backendBookings.find(b => 
-                      b.serviceId === localBooking.serviceId && 
+                    const backendBookingForService = backendBookings.find(b =>
+                      b.serviceId === localBooking.serviceId &&
                       b.customerId === localBooking.customerId
                     );
-                    
+
                     if (backendBookingForService) {
                       // Replace local booking with backend booking
                       console.log('Replacing local booking with backend booking:', backendBookingForService);
@@ -277,11 +279,11 @@ const CustomerDashboard = () => {
                     }
                   }
                 });
-                
+
                 console.log('Final merged bookings count:', mergedBookings.length);
                 return mergedBookings;
               });
-              
+
               bookingsList = bookingsResponse.data || [];
             } catch (error) {
               console.error('Error loading bookings:', error);
@@ -289,7 +291,7 @@ const CustomerDashboard = () => {
               // Don't clear bookings on error to preserve local state
               console.log('Preserving local bookings due to backend error');
             }
-            
+
             try {
               console.log('Fetching bid requests for user:', user.uid);
               const bidRequestsResponse = await api.getMyBidRequests();
@@ -342,7 +344,7 @@ const CustomerDashboard = () => {
         setBookings([]);
         setBidRequests([]);
       }
-      
+
       // Update stats
       setStats({
         upcomingBookings: bookingsList.filter(b => b.status === 'confirmed').length || 0,
@@ -350,7 +352,7 @@ const CustomerDashboard = () => {
         favoriteProviders: providers.length || 0,
         reviews: bidRequestsList.length || 0
       });
-      
+
     } catch (error) {
       console.error('Error loading data:', error);
       toast.error('Failed to load data');
@@ -364,7 +366,7 @@ const CustomerDashboard = () => {
     try {
       console.log('Starting event need creation...');
       console.log('Event need form:', eventNeedForm);
-      
+
       if (!eventNeedForm.eventName || !eventNeedForm.eventType || !eventNeedForm.eventDate || !eventNeedForm.location || !eventNeedForm.headcount) {
         toast.error('Please fill in all required fields');
         return;
@@ -384,12 +386,12 @@ const CustomerDashboard = () => {
       };
 
       console.log('Event need data to send:', bidRequestData);
-      
+
       const response = await api.createBidRequest(bidRequestData);
       console.log('Event need response:', response);
-      
+
       toast.success('Event need posted successfully! Providers will respond soon.');
-      
+
       setShowEventNeedModal(false);
       setEventNeedForm({
         eventName: '',
@@ -400,7 +402,7 @@ const CustomerDashboard = () => {
         budget: '',
         needWholeTeam: false
       });
-      
+
       console.log('Refreshing data...');
       await loadData(); // Refresh data
       console.log('Data refreshed successfully');
@@ -424,7 +426,7 @@ const CustomerDashboard = () => {
       console.log('Starting direct booking creation...');
       console.log('Selected service:', selectedService);
       console.log('Booking form:', bookingForm);
-      
+
       if (!selectedService || !bookingForm.eventDate || !bookingForm.location || !bookingForm.budget) {
         toast.error('Please fill in all required fields including budget');
         return;
@@ -444,12 +446,12 @@ const CustomerDashboard = () => {
       };
 
       console.log('Direct booking data to send:', bookingData);
-      
+
       // Pre-validate against service schedule to avoid conflicts
       try {
         const scheduleRes = await api.services.getServiceSchedule(selectedService.id).catch(() => api.services.getServiceScheduleAlt(selectedService.id));
         const schedule = scheduleRes?.data || [];
-        const normalizeTime = (t) => (t && t.length >= 4 ? t.slice(0,5) : '');
+        const normalizeTime = (t) => (t && t.length >= 4 ? t.slice(0, 5) : '');
         const desiredDate = bookingData.eventDate;
         const desiredTime = normalizeTime(bookingData.eventTime || '');
         const hasConflict = schedule.some(s => {
@@ -471,7 +473,7 @@ const CustomerDashboard = () => {
 
       const response = await api.bookNow(bookingData);
       console.log('Direct booking response:', response);
-      
+
       // Optimistically update the local state immediately
       const newBooking = {
         id: response.data?.id || `temp-${Date.now()}`, // Use actual booking ID from response
@@ -497,25 +499,25 @@ const CustomerDashboard = () => {
       // Add the new booking to the local state immediately
       setBookings(prevBookings => {
         // Check if booking already exists to prevent duplicates
-        const existingBooking = prevBookings.find(b => 
-          b.serviceId === newBooking.serviceId && 
+        const existingBooking = prevBookings.find(b =>
+          b.serviceId === newBooking.serviceId &&
           (b.status === 'pending' || b.status === 'confirmed' || b.status === 'in_progress')
         );
-        
+
         if (existingBooking) {
           console.log('Booking already exists for this service, not adding duplicate');
           return prevBookings;
         }
-        
+
         console.log('Adding new booking to local state:', newBooking);
         console.log('Previous bookings count:', prevBookings.length);
         const updatedBookings = [newBooking, ...prevBookings];
         console.log('Updated bookings count:', updatedBookings.length);
         return updatedBookings;
       });
-      
+
       toast.success('Booking request sent! Waiting for provider confirmation.');
-      
+
       setShowBookingModal(false);
       setSelectedService(null);
       setBookingForm({
@@ -526,7 +528,7 @@ const CustomerDashboard = () => {
         budget: '',
         guestCount: ''
       });
-      
+
       // Only refresh data if we used a temporary ID (optimistic update)
       if (newBooking.isOptimistic) {
         console.log('Scheduling data refresh for optimistic booking...');
@@ -544,7 +546,7 @@ const CustomerDashboard = () => {
           console.log('Data refreshed successfully');
         }, 500); // Shorter delay for real bookings
       }
-      
+
     } catch (error) {
       console.error('Error creating direct booking:', error);
       toast.error(`Failed to book service: ${error.message}`);
@@ -596,7 +598,7 @@ const CustomerDashboard = () => {
       // Find the specific bid request to check actual bid count
       const bidRequest = bidRequests.find(request => request.id === requestId);
       const actualBidCount = bidRequest?.bids?.length || 0;
-      
+
       // Only show confirmation if there are actual bids
       if (actualBidCount > 0) {
         const confirmMessage = 'This event has received bids from providers. Are you sure you want to delete it? This will notify all providers who submitted bids.';
@@ -624,7 +626,7 @@ const CustomerDashboard = () => {
       const matchesDirectServiceId = request.serviceId === service.id;
       // Check if category matches (as fallback)
       const matchesCategory = request.preferredCategories?.includes(service.category);
-      
+
       return matchesServiceId || matchesDirectServiceId || matchesCategory;
     });
   };
@@ -685,7 +687,7 @@ const CustomerDashboard = () => {
   const isSlotAvailable = (service, date, time) => {
     if (!date) return false;
     const all = getAllActiveBookingsForService(service || {});
-    const normalizeTime = (t) => (t && t.length >= 4 ? t.slice(0,5) : '');
+    const normalizeTime = (t) => (t && t.length >= 4 ? t.slice(0, 5) : '');
     const desiredTime = normalizeTime(time);
     return !all.some((b) => {
       const bookedDate = b.eventDate || b.date;
@@ -701,15 +703,15 @@ const CustomerDashboard = () => {
   // Filter services based on search and category
   const filteredServices = services.filter(service => {
     const matchesSearch = service.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         service.description?.toLowerCase().includes(searchTerm.toLowerCase());
-    
+      service.description?.toLowerCase().includes(searchTerm.toLowerCase());
+
     // Check if filtering by provider ID (when clicking "View Services" from provider card)
     const isProviderFilter = categoryFilter !== 'all' && providers.some(p => p.id === categoryFilter);
-    
-    const matchesCategory = categoryFilter === 'all' || 
-                           service.category === categoryFilter ||
-                           (isProviderFilter && service.providerId === categoryFilter);
-    
+
+    const matchesCategory = categoryFilter === 'all' ||
+      service.category === categoryFilter ||
+      (isProviderFilter && service.providerId === categoryFilter);
+
     return matchesSearch && matchesCategory;
   });
 
@@ -749,7 +751,7 @@ const CustomerDashboard = () => {
             </div>
           </div>
         </PremiumCard>
-        
+
         <PremiumCard className="p-6">
           <div className="flex items-center justify-between">
             <div>
@@ -761,7 +763,7 @@ const CustomerDashboard = () => {
             </div>
           </div>
         </PremiumCard>
-        
+
         <PremiumCard className="p-6">
           <div className="flex items-center justify-between">
             <div>
@@ -773,7 +775,7 @@ const CustomerDashboard = () => {
             </div>
           </div>
         </PremiumCard>
-        
+
         <PremiumCard className="p-6">
           <div className="flex items-center justify-between">
             <div>
@@ -795,7 +797,7 @@ const CustomerDashboard = () => {
             View All
           </PremiumButton>
         </div>
-        
+
         {bookings.length > 0 ? (
           <div className="space-y-4">
             {bookings.slice(0, 3).map((booking, index) => (
@@ -826,15 +828,14 @@ const CustomerDashboard = () => {
                 </div>
                 <div className="text-right">
                   <div className="font-bold text-slate-900">₹{booking.budget || booking.amount || 'TBD'}</div>
-                  <div className={`text-sm px-3 py-1 rounded-full ${
-                    booking.status === 'confirmed' 
-                      ? 'bg-green-100 text-green-700' 
-                      : booking.status === 'pending'
+                  <div className={`text-sm px-3 py-1 rounded-full ${booking.status === 'confirmed'
+                    ? 'bg-green-100 text-green-700'
+                    : booking.status === 'pending'
                       ? 'bg-yellow-100 text-yellow-700'
                       : booking.status === 'cancelled'
-                      ? 'bg-red-100 text-red-700'
-                      : 'bg-gray-100 text-gray-700'
-                  }`}>
+                        ? 'bg-red-100 text-red-700'
+                        : 'bg-gray-100 text-gray-700'
+                    }`}>
                     {booking.status}
                   </div>
                 </div>
@@ -888,7 +889,7 @@ const CustomerDashboard = () => {
           </div>
         </div>
       )}
-      
+
       {!loading && bidRequests.length > 0 && (
         <div className="space-y-4">
           <h3 className="text-xl font-semibold text-slate-800">Active My Events</h3>
@@ -912,7 +913,7 @@ const CustomerDashboard = () => {
                           <p className="text-slate-600">{request.bids?.length || 0} bids received</p>
                         </div>
                       </div>
-                      
+
                       <div className="grid grid-cols-2 gap-4 mb-4">
                         <div className="flex items-center space-x-2 text-slate-600">
                           <Calendar className="w-4 h-4" />
@@ -923,7 +924,7 @@ const CustomerDashboard = () => {
                           <span>{request.location}</span>
                         </div>
                         <div className="flex items-center space-x-2 text-slate-600">
-                        {/* currency icon removed per request */}
+                          {/* currency icon removed per request */}
                           <span className="font-semibold">Budget: ₹{request.budget}</span>
                         </div>
                         <div className="flex items-center space-x-2 text-slate-600">
@@ -938,23 +939,22 @@ const CustomerDashboard = () => {
                         </p>
                       )}
                     </div>
-                    
+
                     <div className="text-right">
-                      <div className={`px-3 py-1 rounded-full text-sm font-semibold mb-2 ${
-                        request.status === 'open' 
-                          ? 'bg-green-100 text-green-700' 
-                          : request.status === 'awarded'
+                      <div className={`px-3 py-1 rounded-full text-sm font-semibold mb-2 ${request.status === 'open'
+                        ? 'bg-green-100 text-green-700'
+                        : request.status === 'awarded'
                           ? 'bg-blue-100 text-blue-700'
                           : 'bg-gray-100 text-gray-700'
-                      }`}>
+                        }`}>
                         {request.status}
                       </div>
-                      
+
                       {/* Delete button - only show for open events */}
                       {request.status === 'open' && (
                         <div className="mt-2">
-                          <PremiumButton 
-                            variant="ghost" 
+                          <PremiumButton
+                            variant="ghost"
                             size="sm"
                             onClick={() => handleDeleteEvent(request.id)}
                             className="text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200 hover:border-red-300"
@@ -986,20 +986,19 @@ const CustomerDashboard = () => {
                               </div>
                               <div className="text-right">
                                 <p className="text-lg font-bold text-indigo-600">₹{bid.price}</p>
-                                <div className={`px-2 py-1 rounded text-xs font-semibold ${
-                                  bid.status === 'pending' 
-                                    ? 'bg-yellow-100 text-yellow-700' 
-                                    : bid.status === 'accepted'
+                                <div className={`px-2 py-1 rounded text-xs font-semibold ${bid.status === 'pending'
+                                  ? 'bg-yellow-100 text-yellow-700'
+                                  : bid.status === 'accepted'
                                     ? 'bg-green-100 text-green-700'
                                     : 'bg-red-100 text-red-700'
-                                }`}>
+                                  }`}>
                                   {bid.status}
                                 </div>
                               </div>
                             </div>
-                            
+
                             <p className="text-slate-700 text-sm mb-3">{bid.description}</p>
-                            
+
                             {bid.estimatedTime && (
                               <p className="text-slate-600 text-xs mb-3">
                                 <Clock className="w-3 h-3 inline mr-1" />
@@ -1010,24 +1009,24 @@ const CustomerDashboard = () => {
                             {bid.status === 'pending' && request.status === 'open' && (
                               <div className="flex space-x-2">
                                 <Link href={`/provider/profile?id=${bid.providerId}`}>
-                                  <PremiumButton 
-                                    variant="ghost" 
+                                  <PremiumButton
+                                    variant="ghost"
                                     size="sm"
                                   >
                                     <Eye className="w-4 h-4 mr-1" />
                                     View Profile
                                   </PremiumButton>
                                 </Link>
-                                <PremiumButton 
-                                  variant="primary" 
+                                <PremiumButton
+                                  variant="primary"
                                   size="sm"
                                   onClick={() => handleAcceptBid(request.id, bid.providerId)}
                                 >
                                   <CheckCircle className="w-4 h-4 mr-1" />
                                   Accept
                                 </PremiumButton>
-                                <PremiumButton 
-                                  variant="ghost" 
+                                <PremiumButton
+                                  variant="ghost"
                                   size="sm"
                                   onClick={() => handleRejectBid(request.id, bid.providerId)}
                                   className="text-red-600 hover:text-red-700"
@@ -1085,7 +1084,7 @@ const CustomerDashboard = () => {
                           <span>{booking.location}</span>
                         </div>
                         <div className="flex items-center space-x-2">
-                        {/* currency icon removed per request */}
+                          {/* currency icon removed per request */}
                           <span className="text-2xl font-bold text-indigo-600">₹{booking.price || booking.budget}</span>
                         </div>
                       </div>
@@ -1096,7 +1095,7 @@ const CustomerDashboard = () => {
                       </div>
                     </div>
                   </div>
-                  
+
                   <div className="mt-4 p-3 bg-yellow-50 rounded-lg">
                     <p className="text-sm text-yellow-800">
                       <Clock className="w-4 h-4 inline mr-1" />
@@ -1139,37 +1138,36 @@ const CustomerDashboard = () => {
                           <span>{booking.location}</span>
                         </div>
                         <div className="flex items-center space-x-2">
-                        {/* currency icon removed per request */}
+                          {/* currency icon removed per request */}
                           <span className="text-2xl font-bold text-indigo-600">₹{booking.price || booking.budget}</span>
                         </div>
                       </div>
                     </div>
                     <div className="text-right">
-                      <div className={`px-3 py-1 rounded-full text-sm font-semibold ${
-                        booking.status === 'confirmed' 
-                          ? 'bg-green-100 text-green-700' 
-                          : booking.status === 'in_progress'
+                      <div className={`px-3 py-1 rounded-full text-sm font-semibold ${booking.status === 'confirmed'
+                        ? 'bg-green-100 text-green-700'
+                        : booking.status === 'in_progress'
                           ? 'bg-blue-100 text-blue-700'
                           : booking.status === 'completed'
-                          ? 'bg-purple-100 text-purple-700'
-                          : booking.status === 'cancelled'
-                          ? 'bg-red-100 text-red-700'
-                          : 'bg-gray-100 text-gray-700'
-                      }`}>
+                            ? 'bg-purple-100 text-purple-700'
+                            : booking.status === 'cancelled'
+                              ? 'bg-red-100 text-red-700'
+                              : 'bg-gray-100 text-gray-700'
+                        }`}>
                         {booking.status}
                       </div>
                     </div>
                   </div>
-                  
+
                   <div className="flex items-center justify-between mt-6">
                     <div className="flex space-x-2">
                       <PremiumButton variant="ghost" size="sm">
                         <MessageCircle className="w-4 h-4" />
                       </PremiumButton>
                       {booking.status === 'confirmed' && (
-                        <PremiumButton 
-                          variant="ghost" 
-                          size="sm" 
+                        <PremiumButton
+                          variant="ghost"
+                          size="sm"
                           onClick={() => handleCancelBooking(booking.id)}
                           className="text-red-600 hover:text-red-700"
                         >
@@ -1234,11 +1232,10 @@ const CustomerDashboard = () => {
           >
             <PremiumCard className={`p-6 ${notification.unread ? 'ring-2 ring-indigo-200' : ''}`}>
               <div className="flex items-start space-x-4">
-                <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${
-                  notification.type === 'welcome' ? 'bg-indigo-100' :
+                <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${notification.type === 'welcome' ? 'bg-indigo-100' :
                   notification.type === 'booking' ? 'bg-blue-100' :
-                  notification.type === 'payment' ? 'bg-green-100' : 'bg-yellow-100'
-                }`}>
+                    notification.type === 'payment' ? 'bg-green-100' : 'bg-yellow-100'
+                  }`}>
                   {notification.type === 'welcome' && <Sparkles className="w-6 h-6 text-indigo-600" />}
                   {notification.type === 'booking' && <Calendar className="w-6 h-6 text-blue-600" />}
                   {notification.type === 'payment' && <CheckCircle className="w-6 h-6 text-green-600" />}
@@ -1256,6 +1253,81 @@ const CustomerDashboard = () => {
             </PremiumCard>
           </motion.div>
         ))}
+      </div>
+    </div>
+  );
+
+  const renderFeatures = () => (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <h2 className="text-3xl font-bold text-slate-900">Features</h2>
+        <div className="flex items-center space-x-2 text-slate-600">
+          <Award className="w-6 h-6" />
+          <span className="text-lg">Premium Tools</span>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Certificate Generation Card */}
+        <Link href="/certificate">
+          <PremiumCard className="p-6 cursor-pointer hover:shadow-lg transition-all duration-300 group h-full">
+            <div className="flex flex-col h-full">
+              <div className="flex items-center space-x-4 mb-4">
+                <div className="flex-shrink-0">
+                  <div className="w-12 h-12 bg-gradient-to-r from-amber-500 to-yellow-600 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform duration-300">
+                    <Award className="w-6 h-6 text-white" />
+                  </div>
+                </div>
+                <div className="flex-1">
+                  <h3 className="text-lg font-bold text-slate-900 mb-1">Certificate Generator</h3>
+                  <p className="text-slate-600 text-sm">
+                    Create professional certificates for events and achievements
+                  </p>
+                </div>
+                <div className="flex-shrink-0">
+                  <ArrowRight className="w-5 h-5 text-slate-400 group-hover:text-amber-600 transition-colors" />
+                </div>
+              </div>
+              <div className="flex-1 flex items-end">
+                <div className="flex items-center space-x-4 text-xs text-slate-500 w-full">
+                  <div className="flex items-center space-x-1">
+                    <CheckCircle className="w-3 h-3" />
+                    <span>PDF & PNG</span>
+                  </div>
+                  <div className="flex items-center space-x-1">
+                    <CheckCircle className="w-3 h-3" />
+                    <span>Custom Design</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </PremiumCard>
+        </Link>
+
+        {/* Placeholder for future features */}
+        <PremiumCard className="p-6 h-full">
+          <div className="flex flex-col h-full">
+            <div className="flex items-center space-x-4 mb-4">
+              <div className="flex-shrink-0">
+                <div className="w-12 h-12 bg-gradient-to-r from-indigo-500 to-purple-600 rounded-xl flex items-center justify-center">
+                  <Sparkles className="w-6 h-6 text-white" />
+                </div>
+              </div>
+              <div className="flex-1">
+                <h3 className="text-lg font-bold text-slate-900 mb-1">More Features Coming Soon</h3>
+                <p className="text-slate-600 text-sm">
+                  We're constantly adding new premium features to enhance your event management experience.
+                </p>
+              </div>
+            </div>
+            <div className="flex-1 flex items-end">
+              <div className="flex items-center space-x-2 text-sm text-slate-500">
+                <Clock className="w-4 h-4" />
+                <span>Stay tuned for updates</span>
+              </div>
+            </div>
+          </div>
+        </PremiumCard>
       </div>
     </div>
   );
@@ -1360,299 +1432,298 @@ const CustomerDashboard = () => {
   const renderServices = () => {
     // Check if we're filtering by a specific provider
     const selectedProvider = providers.find(p => p.id === categoryFilter);
-    
-    return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-3xl font-bold text-slate-900">
-            {selectedProvider ? `${selectedProvider.name}'s Services` : 'Browse Services'}
-          </h2>
-          {selectedProvider && (
-            <button
-              onClick={() => setCategoryFilter('all')}
-              className="text-indigo-600 hover:text-indigo-800 text-sm mt-1 flex items-center"
-            >
-              <ArrowLeft className="w-4 h-4 mr-1" />
-              Back to all services
-            </button>
-          )}
-        </div>
-        <div className="flex items-center space-x-4">
-          <div className="relative">
-            <Search className="w-5 h-5 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
-            <input
-              type="text"
-              placeholder="Search services..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-10 pr-4 py-2 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500"
-            />
-          </div>
-          <select
-            value={categoryFilter}
-            onChange={(e) => setCategoryFilter(e.target.value)}
-            className="px-4 py-2 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500"
-          >
-            <option value="all">All Categories</option>
-            <option value="photography">Photography</option>
-            <option value="catering">Catering</option>
-            <option value="decoration">Decoration</option>
-            <option value="music">Music & Entertainment</option>
-            <option value="transport">Transportation</option>
-            <option value="venue">Venue</option>
-            <option value="planning">Event Planning</option>
-            <option value="other">Other</option>
-          </select>
-        </div>
-      </div>
 
-      {loading ? (
-        <div className="text-center py-12">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading services...</p>
-        </div>
-      ) : filteredServices.length > 0 ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filteredServices.map((service, index) => (
-            <motion.div
-              key={service.id}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.5, delay: index * 0.1 }}
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-3xl font-bold text-slate-900">
+              {selectedProvider ? `${selectedProvider.name}'s Services` : 'Browse Services'}
+            </h2>
+            {selectedProvider && (
+              <button
+                onClick={() => setCategoryFilter('all')}
+                className="text-indigo-600 hover:text-indigo-800 text-sm mt-1 flex items-center"
+              >
+                <ArrowLeft className="w-4 h-4 mr-1" />
+                Back to all services
+              </button>
+            )}
+          </div>
+          <div className="flex items-center space-x-4">
+            <div className="relative">
+              <Search className="w-5 h-5 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+              <input
+                type="text"
+                placeholder="Search services..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-10 pr-4 py-2 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              />
+            </div>
+            <select
+              value={categoryFilter}
+              onChange={(e) => setCategoryFilter(e.target.value)}
+              className="px-4 py-2 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500"
             >
-              <PremiumCard className="p-6 cursor-pointer" hoverEffect="lift" onClick={() => { setSelectedService(service); setShowServiceModal(true); }}>
-                <div className="flex items-start justify-between mb-4">
-                  <div className="flex-1">
-                    <h3 className="text-xl font-bold text-slate-900 mb-2">{service.name}</h3>
-                    <p className="text-slate-600 mb-3 line-clamp-2">{service.description}</p>
-                    <div className="flex items-center space-x-4 text-sm text-slate-500 mb-4">
-                      <span className="flex items-center">
-                        ₹{service.price}
-                      </span>
-                      <span className="flex items-center">
-                        <Clock className="w-4 h-4 mr-1" />
-                        {service.duration || 'Varies'}
-                      </span>
-                    </div>
-                    <div className="flex items-center space-x-2 mb-4">
-                      <span className={`px-3 py-1 rounded-full text-sm font-medium ${
-                        service.category === 'photography' ? 'bg-purple-100 text-purple-700' :
-                        service.category === 'catering' ? 'bg-green-100 text-green-700' :
-                        service.category === 'decoration' ? 'bg-pink-100 text-pink-700' :
-                        service.category === 'music' ? 'bg-blue-100 text-blue-700' :
-                        'bg-gray-100 text-gray-700'
-                      }`}>
-                        {service.category || 'Other'}
-                      </span>
-                      {/* Availability chip hidden per request */}
-                      {isBookingInProgress && bookingServiceId === service.id && (
-                        <span className="px-3 py-1 rounded-full text-sm font-medium bg-blue-100 text-blue-700">
-                          Processing...
+              <option value="all">All Categories</option>
+              <option value="photography">Photography</option>
+              <option value="catering">Catering</option>
+              <option value="decoration">Decoration</option>
+              <option value="music">Music & Entertainment</option>
+              <option value="transport">Transportation</option>
+              <option value="venue">Venue</option>
+              <option value="planning">Event Planning</option>
+              <option value="other">Other</option>
+            </select>
+          </div>
+        </div>
+
+        {loading ? (
+          <div className="text-center py-12">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto mb-4"></div>
+            <p className="text-gray-600">Loading services...</p>
+          </div>
+        ) : filteredServices.length > 0 ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {filteredServices.map((service, index) => (
+              <motion.div
+                key={service.id}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.5, delay: index * 0.1 }}
+              >
+                <PremiumCard className="p-6 cursor-pointer" hoverEffect="lift" onClick={() => { setSelectedService(service); setShowServiceModal(true); }}>
+                  <div className="flex items-start justify-between mb-4">
+                    <div className="flex-1">
+                      <h3 className="text-xl font-bold text-slate-900 mb-2">{service.name}</h3>
+                      <p className="text-slate-600 mb-3 line-clamp-2">{service.description}</p>
+                      <div className="flex items-center space-x-4 text-sm text-slate-500 mb-4">
+                        <span className="flex items-center">
+                          ₹{service.price}
                         </span>
-                      )}
-                      {/* Bid status chip hidden per request */}
+                        <span className="flex items-center">
+                          <Clock className="w-4 h-4 mr-1" />
+                          {service.duration || 'Varies'}
+                        </span>
+                      </div>
+                      <div className="flex items-center space-x-2 mb-4">
+                        <span className={`px-3 py-1 rounded-full text-sm font-medium ${service.category === 'photography' ? 'bg-purple-100 text-purple-700' :
+                          service.category === 'catering' ? 'bg-green-100 text-green-700' :
+                            service.category === 'decoration' ? 'bg-pink-100 text-pink-700' :
+                              service.category === 'music' ? 'bg-blue-100 text-blue-700' :
+                                'bg-gray-100 text-gray-700'
+                          }`}>
+                          {service.category || 'Other'}
+                        </span>
+                        {/* Availability chip hidden per request */}
+                        {isBookingInProgress && bookingServiceId === service.id && (
+                          <span className="px-3 py-1 rounded-full text-sm font-medium bg-blue-100 text-blue-700">
+                            Processing...
+                          </span>
+                        )}
+                        {/* Bid status chip hidden per request */}
+                      </div>
                     </div>
                   </div>
-                </div>
-                <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2" onClick={(e) => e.stopPropagation()}>
-                  <div className="flex flex-col sm:flex-row gap-2 w-full md:w-auto">
+                  <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2" onClick={(e) => e.stopPropagation()}>
+                    <div className="flex flex-col sm:flex-row gap-2 w-full md:w-auto">
+                      <PremiumButton
+                        variant="primary"
+                        size="sm"
+                        className="w-full sm:min-w-[150px] text-xs md:text-sm py-2 min-h-[40px] whitespace-normal leading-snug justify-center shadow-none"
+                        onClick={() => {
+                          if (isBookingInProgress) return;
+                          setSelectedService(service);
+                          setShowBookingModal(true);
+                        }}
+                        disabled={isBookingInProgress}
+                      >
+                        Booking
+                      </PremiumButton>
+                      <PremiumButton
+                        variant="primary"
+                        size="sm"
+                        className="w-full sm:min-w-[150px] text-xs md:text-sm py-2 min-h-[40px] whitespace-normal leading-snug justify-center shadow-none"
+                        onClick={() => {
+                          const booking = getBookingForService(service);
+                          const bidReq = getBidRequestForService(service);
+                          // If not bookable, show status modal instead of booking flow
+                          if (booking || bidReq) {
+                            setStatusInfo({
+                              service,
+                              booking,
+                              bidReq
+                            });
+                            setShowStatusModal(true);
+                            return;
+                          }
+                          if (!isBookingInProgress) {
+                            setSelectedService(service);
+                            // Load schedule for disabled dates/times
+                            setServiceSchedule([]);
+                            api.services.getServiceSchedule(service.id)
+                              .then((res) => setServiceSchedule(res?.data || []))
+                              .catch(() => api.services.getServiceScheduleAlt(service.id).then((res2) => setServiceSchedule(res2?.data || [])).catch(() => setServiceSchedule([])));
+                            setShowBookingModal(true);
+                          }
+                        }}
+                        disabled={service.isActive === false || isBookingInProgress}
+                      >
+                        {(() => {
+                          const booking = getBookingForService(service);
+                          const bidReq = getBidRequestForService(service);
+                          if (isBookingInProgress && bookingServiceId === service.id) return 'Booking...';
+                          if (bidReq && (bidReq.status === 'open' || bidReq.status === 'awarded')) return bidReq.status === 'open' ? 'Pending / Confirmed' : 'Bid Awarded';
+                          if (!booking) return 'Book Now';
+
+                          switch (booking.status) {
+                            case 'pending':
+                              return 'Booking Pending';
+                            case 'confirmed':
+                              return 'Already Booked';
+                            case 'in_progress':
+                              return 'In Progress';
+                            case 'completed':
+                              return 'Completed';
+                            default:
+                              return 'Already Booked';
+                          }
+                        })()}
+                      </PremiumButton>
+                    </div>
+                  </div>
+                  {(() => {
+                    const all = getAllActiveBookingsForService(service) || [];
+                    if (all.length === 0) return null;
+                    const pendingCount = all.filter(b => b.status === 'pending').length;
+                    const confirmedCount = all.filter(b => b.status === 'confirmed' || b.status === 'in_progress').length;
+                    return (
+                      <div className="mt-4 text-xs text-slate-600 flex items-center gap-3">
+                        <span className="px-2.5 py-1.5 rounded-full bg-yellow-50 text-yellow-800 border border-yellow-200">Pending: {pendingCount}</span>
+                        <span className="px-2.5 py-1.5 rounded-full bg-green-50 text-green-800 border border-green-200">Confirmed: {confirmedCount}</span>
+                        <button
+                          className="text-indigo-600 hover:underline font-medium"
+                          onClick={() => {
+                            const booking = getBookingForService(service); // may be null
+                            setStatusInfo({ service, booking: booking || null, bidReq: getBidRequestForService(service) || null });
+                            setShowStatusModal(true);
+                          }}
+                        >
+                          View details
+                        </button>
+                      </div>
+                    );
+                  })()}
+                </PremiumCard>
+              </motion.div>
+            ))}
+          </div>
+        ) : (
+          <div className="text-center py-12">
+            <Search className="w-16 h-16 text-slate-400 mx-auto mb-4" />
+            <h3 className="text-xl font-semibold text-slate-600 mb-2">No services found</h3>
+            <p className="text-slate-500">Try adjusting your search or filter criteria.</p>
+          </div>
+        )}
+      </div>
+    );
+
+    // Render View Providers tab
+    const renderProviders = () => (
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <h2 className="text-3xl font-bold text-slate-900">Service Providers</h2>
+        </div>
+
+        {loading ? (
+          <div className="text-center py-12">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto mb-4"></div>
+            <p className="text-gray-600">Loading providers...</p>
+          </div>
+        ) : providers.length > 0 ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {providers.map((provider, index) => (
+              <motion.div
+                key={provider.id}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.5, delay: index * 0.1 }}
+              >
+                <PremiumCard className="p-6" hoverEffect="lift">
+                  <div className="text-center mb-4">
+                    {provider.picture ? (
+                      <img
+                        src={provider.picture}
+                        alt={provider.name}
+                        className="w-16 h-16 rounded-full mx-auto mb-3 object-cover"
+                      />
+                    ) : (
+                      <div className="w-16 h-16 bg-gradient-to-r from-indigo-100 to-purple-100 rounded-full flex items-center justify-center mx-auto mb-3">
+                        <Users className="w-8 h-8 text-indigo-600" />
+                      </div>
+                    )}
+                    <h3 className="text-xl font-bold text-slate-900 mb-2">{provider.businessName || provider.name}</h3>
+                    <p className="text-slate-600 mb-2">{provider.totalServices} service{provider.totalServices !== 1 ? 's' : ''} available</p>
+                    {provider.location && (
+                      <p className="text-sm text-slate-500 mb-2">{provider.location}</p>
+                    )}
+                    {provider.rating > 0 && (
+                      <div className="flex items-center justify-center mb-2">
+                        <Star className="w-4 h-4 text-yellow-400 fill-current" />
+                        <span className="text-sm text-slate-600 ml-1">{provider.rating.toFixed(1)}</span>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="space-y-2 mb-4">
+                    {provider.services.slice(0, 3).map((service) => (
+                      <div key={service.id} className="flex items-center justify-between text-sm">
+                        <span className="text-slate-600 truncate">{service.name}</span>
+                        <span className="text-indigo-600 font-semibold">₹{service.price}</span>
+                      </div>
+                    ))}
+                    {provider.services.length > 3 && (
+                      <p className="text-sm text-slate-500">+{provider.services.length - 3} more services</p>
+                    )}
+                  </div>
+
+                  <div className="flex items-center justify-between">
+                    <PremiumButton
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => {
+                        setSelectedProvider(provider);
+                        setShowProviderModal(true);
+                      }}
+                    >
+                      <Eye className="w-4 h-4 mr-2" />
+                      View Profile
+                    </PremiumButton>
                     <PremiumButton
                       variant="primary"
                       size="sm"
-                      className="w-full sm:min-w-[150px] text-xs md:text-sm py-2 min-h-[40px] whitespace-normal leading-snug justify-center shadow-none"
                       onClick={() => {
-                        if (isBookingInProgress) return;
-                        setSelectedService(service);
-                        setShowBookingModal(true);
+                        setCategoryFilter(provider.id); // Use provider ID as filter
+                        setActiveTab('services');
                       }}
-                      disabled={isBookingInProgress}
                     >
-                      Booking
+                      View Services
                     </PremiumButton>
-                  <PremiumButton 
-                    variant="primary" 
-                    size="sm"
-                    className="w-full sm:min-w-[150px] text-xs md:text-sm py-2 min-h-[40px] whitespace-normal leading-snug justify-center shadow-none"
-                    onClick={() => {
-                      const booking = getBookingForService(service);
-                      const bidReq = getBidRequestForService(service);
-                      // If not bookable, show status modal instead of booking flow
-                      if (booking || bidReq) {
-                        setStatusInfo({
-                          service,
-                          booking,
-                          bidReq
-                        });
-                        setShowStatusModal(true);
-                        return;
-                      }
-                      if (!isBookingInProgress) {
-                        setSelectedService(service);
-                        // Load schedule for disabled dates/times
-                        setServiceSchedule([]);
-                        api.services.getServiceSchedule(service.id)
-                          .then((res) => setServiceSchedule(res?.data || []))
-                          .catch(() => api.services.getServiceScheduleAlt(service.id).then((res2) => setServiceSchedule(res2?.data || [])).catch(() => setServiceSchedule([])));
-                        setShowBookingModal(true);
-                      }
-                    }}
-                    disabled={service.isActive === false || isBookingInProgress}
-                  >
-                    {(() => {
-                      const booking = getBookingForService(service);
-                      const bidReq = getBidRequestForService(service);
-                      if (isBookingInProgress && bookingServiceId === service.id) return 'Booking...';
-                      if (bidReq && (bidReq.status === 'open' || bidReq.status === 'awarded')) return bidReq.status === 'open' ? 'Pending / Confirmed' : 'Bid Awarded';
-                      if (!booking) return 'Book Now';
-                      
-                      switch (booking.status) {
-                        case 'pending':
-                          return 'Booking Pending';
-                        case 'confirmed':
-                          return 'Already Booked';
-                        case 'in_progress':
-                          return 'In Progress';
-                        case 'completed':
-                          return 'Completed';
-                        default:
-                          return 'Already Booked';
-                      }
-                    })()}
-                  </PremiumButton>
                   </div>
-                </div>
-                {(() => {
-                  const all = getAllActiveBookingsForService(service) || [];
-                  if (all.length === 0) return null;
-                  const pendingCount = all.filter(b => b.status === 'pending').length;
-                  const confirmedCount = all.filter(b => b.status === 'confirmed' || b.status === 'in_progress').length;
-                  return (
-                    <div className="mt-4 text-xs text-slate-600 flex items-center gap-3">
-                      <span className="px-2.5 py-1.5 rounded-full bg-yellow-50 text-yellow-800 border border-yellow-200">Pending: {pendingCount}</span>
-                      <span className="px-2.5 py-1.5 rounded-full bg-green-50 text-green-800 border border-green-200">Confirmed: {confirmedCount}</span>
-                      <button
-                        className="text-indigo-600 hover:underline font-medium"
-                        onClick={() => {
-                          const booking = getBookingForService(service); // may be null
-                          setStatusInfo({ service, booking: booking || null, bidReq: getBidRequestForService(service) || null });
-                          setShowStatusModal(true);
-                        }}
-                      >
-                        View details
-                      </button>
-                    </div>
-                  );
-                })()}
-              </PremiumCard>
-            </motion.div>
-          ))}
-        </div>
-      ) : (
-        <div className="text-center py-12">
-          <Search className="w-16 h-16 text-slate-400 mx-auto mb-4" />
-          <h3 className="text-xl font-semibold text-slate-600 mb-2">No services found</h3>
-          <p className="text-slate-500">Try adjusting your search or filter criteria.</p>
-        </div>
-      )}
-    </div>
-  );
-
-  // Render View Providers tab
-  const renderProviders = () => (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h2 className="text-3xl font-bold text-slate-900">Service Providers</h2>
+                </PremiumCard>
+              </motion.div>
+            ))}
+          </div>
+        ) : (
+          <div className="text-center py-12">
+            <Users className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+            <h3 className="text-xl font-semibold text-gray-900 mb-2">No Providers Found</h3>
+            <p className="text-gray-600">There are no service providers available at the moment.</p>
+          </div>
+        )}
       </div>
-
-      {loading ? (
-        <div className="text-center py-12">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading providers...</p>
-        </div>
-      ) : providers.length > 0 ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {providers.map((provider, index) => (
-            <motion.div
-              key={provider.id}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.5, delay: index * 0.1 }}
-            >
-              <PremiumCard className="p-6" hoverEffect="lift">
-                <div className="text-center mb-4">
-                  {provider.picture ? (
-                    <img 
-                      src={provider.picture} 
-                      alt={provider.name}
-                      className="w-16 h-16 rounded-full mx-auto mb-3 object-cover"
-                    />
-                  ) : (
-                    <div className="w-16 h-16 bg-gradient-to-r from-indigo-100 to-purple-100 rounded-full flex items-center justify-center mx-auto mb-3">
-                      <Users className="w-8 h-8 text-indigo-600" />
-                    </div>
-                  )}
-                  <h3 className="text-xl font-bold text-slate-900 mb-2">{provider.businessName || provider.name}</h3>
-                  <p className="text-slate-600 mb-2">{provider.totalServices} service{provider.totalServices !== 1 ? 's' : ''} available</p>
-                  {provider.location && (
-                    <p className="text-sm text-slate-500 mb-2">{provider.location}</p>
-                  )}
-                  {provider.rating > 0 && (
-                    <div className="flex items-center justify-center mb-2">
-                      <Star className="w-4 h-4 text-yellow-400 fill-current" />
-                      <span className="text-sm text-slate-600 ml-1">{provider.rating.toFixed(1)}</span>
-                    </div>
-                  )}
-                </div>
-                
-                <div className="space-y-2 mb-4">
-                  {provider.services.slice(0, 3).map((service) => (
-                    <div key={service.id} className="flex items-center justify-between text-sm">
-                      <span className="text-slate-600 truncate">{service.name}</span>
-                      <span className="text-indigo-600 font-semibold">₹{service.price}</span>
-                    </div>
-                  ))}
-                  {provider.services.length > 3 && (
-                    <p className="text-sm text-slate-500">+{provider.services.length - 3} more services</p>
-                  )}
-                </div>
-                
-                <div className="flex items-center justify-between">
-                  <PremiumButton 
-                    variant="ghost" 
-                    size="sm"
-                    onClick={() => {
-                      setSelectedProvider(provider);
-                      setShowProviderModal(true);
-                    }}
-                  >
-                    <Eye className="w-4 h-4 mr-2" />
-                    View Profile
-                  </PremiumButton>
-                  <PremiumButton 
-                    variant="primary" 
-                    size="sm"
-                    onClick={() => {
-                      setCategoryFilter(provider.id); // Use provider ID as filter
-                      setActiveTab('services');
-                    }}
-                  >
-                    View Services
-                  </PremiumButton>
-                </div>
-              </PremiumCard>
-            </motion.div>
-          ))}
-        </div>
-      ) : (
-        <div className="text-center py-12">
-          <Users className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-          <h3 className="text-xl font-semibold text-gray-900 mb-2">No Providers Found</h3>
-          <p className="text-gray-600">There are no service providers available at the moment.</p>
-        </div>
-      )}
-    </div>
-  );
+    );
   };
 
   // Render Browse Providers tab
@@ -1676,18 +1747,18 @@ const CustomerDashboard = () => {
                     <div>
                       <h3 className="text-lg font-semibold text-gray-900">{provider.businessName || provider.name}</h3>
                       <p className="text-sm text-gray-600">
-                        {provider.category 
+                        {provider.category
                           ? provider.category
-                          : provider.categories && provider.categories.length > 0 
-                          ? provider.categories.join(', ').replace(/\b\w/g, l => l.toUpperCase())
-                          : provider.specialties && provider.specialties.length > 0
-                          ? provider.specialties.join(', ')
-                          : ''
+                          : provider.categories && provider.categories.length > 0
+                            ? provider.categories.join(', ').replace(/\b\w/g, l => l.toUpperCase())
+                            : provider.specialties && provider.specialties.length > 0
+                              ? provider.specialties.join(', ')
+                              : ''
                         }
                       </p>
                     </div>
                   </div>
-                  
+
                   <div className="space-y-2 mb-4">
                     <div className="flex items-center text-sm text-gray-600">
                       <Phone className="w-4 h-4 mr-2" />
@@ -1730,7 +1801,7 @@ const CustomerDashboard = () => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100">
       {/* Header */}
-      <motion.div 
+      <motion.div
         className="bg-white/90 backdrop-blur-md border-b border-slate-200/20 sticky top-0 z-40"
         initial={{ y: -100 }}
         animate={{ y: 0 }}
@@ -1738,7 +1809,7 @@ const CustomerDashboard = () => {
       >
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex items-center justify-between">
-            <motion.div 
+            <motion.div
               className="flex items-center space-x-3"
               whileHover={{ scale: 1.05 }}
             >
@@ -1749,7 +1820,7 @@ const CustomerDashboard = () => {
                 Eventrra
               </span>
             </motion.div>
-            
+
             <div className="flex items-center space-x-4">
               <div className="flex items-center space-x-2">
                 <span className="text-slate-600">Customer Dashboard</span>
@@ -1759,8 +1830,8 @@ const CustomerDashboard = () => {
                   <Settings className="w-5 h-5" />
                 </PremiumButton>
               </Link>
-              <PremiumButton 
-                variant="ghost" 
+              <PremiumButton
+                variant="ghost"
                 size="sm"
                 onClick={handleLogout}
               >
@@ -1773,7 +1844,7 @@ const CustomerDashboard = () => {
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Tabs */}
-        <motion.div 
+        <motion.div
           className="flex space-x-1 mb-8 bg-white/60 backdrop-blur-sm rounded-2xl p-2"
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -1783,11 +1854,10 @@ const CustomerDashboard = () => {
             <motion.button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
-              className={`flex items-center space-x-2 px-6 py-3 rounded-xl font-semibold transition-all ${
-                activeTab === tab.id
-                  ? 'bg-indigo-600 text-white shadow-lg'
-                  : 'text-slate-600 hover:bg-white/50'
-              }`}
+              className={`flex items-center space-x-2 px-6 py-3 rounded-xl font-semibold transition-all ${activeTab === tab.id
+                ? 'bg-indigo-600 text-white shadow-lg'
+                : 'text-slate-600 hover:bg-white/50'
+                }`}
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
             >
@@ -1809,6 +1879,7 @@ const CustomerDashboard = () => {
           {activeTab === 'providers' && renderProviders()}
           {activeTab === 'bookings' && renderBookings()}
           {activeTab === 'messages' && renderMessages()}
+          {activeTab === 'features' && renderFeatures()}
           {activeTab === 'notifications' && renderNotifications()}
           {activeTab === 'settings' && renderSettings()}
         </motion.div>
@@ -2009,7 +2080,7 @@ const CustomerDashboard = () => {
                     value={bookingForm.eventDate}
                     onChange={(e) => {
                       setBookingError('');
-                      setBookingForm({...bookingForm, eventDate: e.target.value});
+                      setBookingForm({ ...bookingForm, eventDate: e.target.value });
                     }}
                     className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500"
                     required
@@ -2036,7 +2107,7 @@ const CustomerDashboard = () => {
                     value={bookingForm.eventTime}
                     onChange={(e) => {
                       setBookingError('');
-                      setBookingForm({...bookingForm, eventTime: e.target.value});
+                      setBookingForm({ ...bookingForm, eventTime: e.target.value });
                     }}
                     className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500"
                     list="disabled-times"
@@ -2060,7 +2131,7 @@ const CustomerDashboard = () => {
                 <input
                   type="text"
                   value={bookingForm.location}
-                  onChange={(e) => setBookingForm({...bookingForm, location: e.target.value})}
+                  onChange={(e) => setBookingForm({ ...bookingForm, location: e.target.value })}
                   className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500"
                   placeholder="Enter event location"
                   required
@@ -2075,7 +2146,7 @@ const CustomerDashboard = () => {
                   <input
                     type="number"
                     value={bookingForm.budget}
-                    onChange={(e) => setBookingForm({...bookingForm, budget: e.target.value})}
+                    onChange={(e) => setBookingForm({ ...bookingForm, budget: e.target.value })}
                     className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500"
                     placeholder={`Suggested: ₹${selectedService.price}`}
                     min="0"
@@ -2090,7 +2161,7 @@ const CustomerDashboard = () => {
                   <input
                     type="number"
                     value={bookingForm.guestCount}
-                    onChange={(e) => setBookingForm({...bookingForm, guestCount: e.target.value})}
+                    onChange={(e) => setBookingForm({ ...bookingForm, guestCount: e.target.value })}
                     className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500"
                     placeholder="Number of guests"
                     min="0"
@@ -2104,7 +2175,7 @@ const CustomerDashboard = () => {
                 </label>
                 <textarea
                   value={bookingForm.notes}
-                  onChange={(e) => setBookingForm({...bookingForm, notes: e.target.value})}
+                  onChange={(e) => setBookingForm({ ...bookingForm, notes: e.target.value })}
                   rows={4}
                   className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500"
                   placeholder="Any special requirements or notes for the service provider..."
@@ -2132,8 +2203,8 @@ const CustomerDashboard = () => {
                 >
                   Cancel
                 </PremiumButton>
-                <PremiumButton 
-                  type="submit" 
+                <PremiumButton
+                  type="submit"
                   variant="primary"
                   disabled={isBookingInProgress}
                 >
@@ -2204,7 +2275,7 @@ const CustomerDashboard = () => {
                   const renderItem = (b, color) => (
                     <div key={b.id} className={`p-3 rounded-lg border ${color.bg} ${color.border}`}>
                       <div className="flex items-center justify-between">
-                        <span className={`text-xs font-semibold ${color.text}`}>{(b.status || '').replace('_',' ')}</span>
+                        <span className={`text-xs font-semibold ${color.text}`}>{(b.status || '').replace('_', ' ')}</span>
                         <span className="text-xs text-gray-500">{b.location || '—'}</span>
                       </div>
                       <div className="mt-1 text-sm text-gray-900">{b.eventName || b.eventType || 'Event'}</div>
@@ -2319,7 +2390,7 @@ const CustomerDashboard = () => {
                 <input
                   type="text"
                   value={eventNeedForm.eventName}
-                  onChange={(e) => setEventNeedForm({...eventNeedForm, eventName: e.target.value})}
+                  onChange={(e) => setEventNeedForm({ ...eventNeedForm, eventName: e.target.value })}
                   className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500"
                   placeholder="Enter your event name"
                   required
@@ -2333,8 +2404,8 @@ const CustomerDashboard = () => {
                 <input
                   list="eventTypes"
                   value={eventNeedForm.eventType}
-                  onChange={(e) => setEventNeedForm({...eventNeedForm, eventType: e.target.value})}
-                className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 text-gray-900 placeholder-gray-500 bg-white"
+                  onChange={(e) => setEventNeedForm({ ...eventNeedForm, eventType: e.target.value })}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 text-gray-900 placeholder-gray-500 bg-white"
                   placeholder="Select or type your event type"
                   required
                 />
@@ -2343,7 +2414,7 @@ const CustomerDashboard = () => {
                   <option value="Wedding" />
                   <option value="Corporate" />
                   <option value="Anniversary" />
-                <option value="Others" />
+                  <option value="Others" />
                   <option value="Graduation" />
                   <option value="Conference" />
                   <option value="Party" />
@@ -2358,7 +2429,7 @@ const CustomerDashboard = () => {
                 <input
                   type="date"
                   value={eventNeedForm.eventDate}
-                  onChange={(e) => setEventNeedForm({...eventNeedForm, eventDate: e.target.value})}
+                  onChange={(e) => setEventNeedForm({ ...eventNeedForm, eventDate: e.target.value })}
                   className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500"
                   required
                   min={new Date().toISOString().split('T')[0]}
@@ -2372,7 +2443,7 @@ const CustomerDashboard = () => {
                 <input
                   type="text"
                   value={eventNeedForm.location}
-                  onChange={(e) => setEventNeedForm({...eventNeedForm, location: e.target.value})}
+                  onChange={(e) => setEventNeedForm({ ...eventNeedForm, location: e.target.value })}
                   className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500"
                   placeholder="Enter event location"
                   required
@@ -2386,7 +2457,7 @@ const CustomerDashboard = () => {
                 <input
                   type="number"
                   value={eventNeedForm.headcount}
-                  onChange={(e) => setEventNeedForm({...eventNeedForm, headcount: e.target.value})}
+                  onChange={(e) => setEventNeedForm({ ...eventNeedForm, headcount: e.target.value })}
                   className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500"
                   placeholder="Number of guests"
                   min="1"
@@ -2401,7 +2472,7 @@ const CustomerDashboard = () => {
                 <input
                   type="number"
                   value={eventNeedForm.budget}
-                  onChange={(e) => setEventNeedForm({...eventNeedForm, budget: e.target.value})}
+                  onChange={(e) => setEventNeedForm({ ...eventNeedForm, budget: e.target.value })}
                   className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500"
                   placeholder="Your budget range"
                   min="0"
@@ -2416,7 +2487,7 @@ const CustomerDashboard = () => {
                       type="checkbox"
                       id="needWholeTeam"
                       checked={eventNeedForm.needWholeTeam}
-                      onChange={(e) => setEventNeedForm({...eventNeedForm, needWholeTeam: e.target.checked})}
+                      onChange={(e) => setEventNeedForm({ ...eventNeedForm, needWholeTeam: e.target.checked })}
                       className="w-4 h-4 text-indigo-600 bg-gray-100 border-gray-300 rounded focus:ring-indigo-500 focus:ring-2"
                     />
                     <label htmlFor="needWholeTeam" className="text-sm font-medium text-gray-700">
@@ -2424,8 +2495,8 @@ const CustomerDashboard = () => {
                     </label>
                   </div>
                   <p className="text-xs text-gray-500 mt-1 ml-7">
-                    {eventNeedForm.needWholeTeam 
-                      ? "Service providers will be notified" 
+                    {eventNeedForm.needWholeTeam
+                      ? "Service providers will be notified"
                       : "Freelancers will be notified"
                     }
                   </p>

@@ -3,7 +3,7 @@
 import React, { useRef } from 'react'
 import { jsPDF } from 'jspdf'
 
-export default function CertificateTemplate({ name = '', eventName = '' }) {
+export default function CertificateTemplate({ name = '', eventName = '', date = '' }) {
   const svgRef = useRef(null)
   // Note: we only provide PNG and PDF downloads (SVG download removed).
 
@@ -15,22 +15,47 @@ export default function CertificateTemplate({ name = '', eventName = '' }) {
     const encoded = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(str)
     const img = new Image()
     img.onload = () => {
-      const width = svg.viewBox.baseVal.width || 1200
-      const height = svg.viewBox.baseVal.height || 900
+      // Use higher resolution for better quality
+      const scaleFactor = 2
+      const width = (svg.viewBox.baseVal.width || 1200) * scaleFactor
+      const height = (svg.viewBox.baseVal.height || 900) * scaleFactor
+
       const canvas = document.createElement('canvas')
       canvas.width = width
       canvas.height = height
       const ctx = canvas.getContext('2d')
+
+      // Enable high-quality rendering
+      ctx.imageSmoothingEnabled = true
+      ctx.imageSmoothingQuality = 'high'
+
       // white background
       ctx.fillStyle = '#ffffff'
       ctx.fillRect(0, 0, canvas.width, canvas.height)
-      ctx.drawImage(img, 0, 0)
-      const dataURL = canvas.toDataURL('image/png')
 
-      // Create PDF with same pixel dimensions
+      // Draw image with scaling
+      ctx.drawImage(img, 0, 0, width, height)
+      const dataURL = canvas.toDataURL('image/png', 1.0)
+
+      // Create PDF with proper dimensions (A4 landscape)
       try {
-        const pdf = new jsPDF({ orientation: width > height ? 'landscape' : 'portrait', unit: 'px', format: [width, height] })
-        pdf.addImage(dataURL, 'PNG', 0, 0, width, height)
+        const pdf = new jsPDF({
+          orientation: 'landscape',
+          unit: 'mm',
+          format: 'a4'
+        })
+
+        // Calculate dimensions to fit A4 landscape
+        const pdfWidth = pdf.internal.pageSize.getWidth()
+        const pdfHeight = pdf.internal.pageSize.getHeight()
+        const imgWidth = pdfWidth - 20 // 10mm margin on each side
+        const imgHeight = (height / width) * imgWidth
+
+        // Center the image
+        const x = (pdfWidth - imgWidth) / 2
+        const y = (pdfHeight - imgHeight) / 2
+
+        pdf.addImage(dataURL, 'PNG', x, y, imgWidth, imgHeight)
         const safeName = (name || 'certificate').replace(/\s+/g, '_')
         pdf.save(`certificate-${safeName}.pdf`)
       } catch (err) {
@@ -50,16 +75,27 @@ export default function CertificateTemplate({ name = '', eventName = '' }) {
     const encoded = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(str)
     const img = new Image()
     img.onload = () => {
-      const width = svg.viewBox.baseVal.width || 1200
-      const height = svg.viewBox.baseVal.height || 900
+      // Use higher resolution for better quality
+      const scaleFactor = 2
+      const width = (svg.viewBox.baseVal.width || 1200) * scaleFactor
+      const height = (svg.viewBox.baseVal.height || 900) * scaleFactor
+
       const canvas = document.createElement('canvas')
       canvas.width = width
       canvas.height = height
       const ctx = canvas.getContext('2d')
+
+      // Enable high-quality rendering
+      ctx.imageSmoothingEnabled = true
+      ctx.imageSmoothingQuality = 'high'
+
       // white background
       ctx.fillStyle = '#ffffff'
       ctx.fillRect(0, 0, canvas.width, canvas.height)
-      ctx.drawImage(img, 0, 0)
+
+      // Draw image with scaling
+      ctx.drawImage(img, 0, 0, width, height)
+
       canvas.toBlob((blob) => {
         if (!blob) return
         const url = URL.createObjectURL(blob)
@@ -71,7 +107,7 @@ export default function CertificateTemplate({ name = '', eventName = '' }) {
         a.click()
         a.remove()
         URL.revokeObjectURL(url)
-      })
+      }, 'image/png', 1.0)
     }
     img.onerror = () => alert('Failed to generate PNG from SVG')
     img.src = encoded
@@ -103,8 +139,8 @@ export default function CertificateTemplate({ name = '', eventName = '' }) {
           </clipPath>
         </defs>
 
-  {/* plain background (wavy background removed) */}
-  <rect width="1200" height="900" fill="#fafafa" />
+        {/* plain background (wavy background removed) */}
+        <rect width="1200" height="900" fill="#fafafa" />
 
         {/* inner paper panel with soft shadow */}
         <g filter="url(#softShadow)">
@@ -152,6 +188,17 @@ export default function CertificateTemplate({ name = '', eventName = '' }) {
           <text x="880" y="730" textAnchor="middle">SIGNATURE</text>
         </g>
 
+        {/* Date display */}
+        {date && (
+          <text x="320" y="750" textAnchor="middle" fontFamily="Georgia, 'Times New Roman', serif" fontSize="12" fill="#6b6b6b">
+            {new Date(date).toLocaleDateString('en-US', {
+              year: 'numeric',
+              month: 'long',
+              day: 'numeric'
+            })}
+          </text>
+        )}
+
         <line x1="120" y1="700" x2="520" y2="700" stroke="#d6b86a" strokeWidth="2" strokeDasharray="2 6" />
         <line x1="680" y1="700" x2="1080" y2="700" stroke="#d6b86a" strokeWidth="2" strokeDasharray="2 6" />
 
@@ -161,11 +208,25 @@ export default function CertificateTemplate({ name = '', eventName = '' }) {
         </g>
       </svg>
 
-      <div style={{ display: 'flex', gap: 8 }}>
-        <button type="button" onClick={downloadPNG} className="btn-primary" style={{ padding: '8px 12px' }}>
+      <div className="flex gap-3 mt-4">
+        <button
+          type="button"
+          onClick={downloadPNG}
+          className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium transition-colors duration-200 flex items-center gap-2"
+        >
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+          </svg>
           Download PNG
         </button>
-        <button type="button" onClick={downloadPDF} style={{ padding: '8px 12px' }}>
+        <button
+          type="button"
+          onClick={downloadPDF}
+          className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg font-medium transition-colors duration-200 flex items-center gap-2"
+        >
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+          </svg>
           Download PDF
         </button>
       </div>
