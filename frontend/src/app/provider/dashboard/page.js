@@ -3,6 +3,7 @@
 import { motion } from 'framer-motion';
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import {
   Plus,
   Edit,
@@ -38,13 +39,16 @@ import {
   X,
   Check,
   Briefcase,
-  RefreshCw
+  RefreshCw,
+  Award,
+  ArrowRight
 } from 'lucide-react';
 import PremiumButton from '../../../components/ui/PremiumButton';
 import PremiumCard from '../../../components/ui/PremiumCard';
 import ChatInterface from '../../../components/Chat/ChatInterface';
 import EnhancedMessages from '../../../components/Messages/EnhancedMessages';
 import AIStaffRecommendationModal from '../../../components/ui/AIStaffRecommendationModal';
+import CertificateTemplate from '../../../components/CertificateTemplate';
 import { useAuth } from '../../../contexts/AuthContext';
 import { api } from '../../../lib/api';
 import toast from 'react-hot-toast';
@@ -1941,6 +1945,7 @@ const ProviderDashboard = () => {
     { id: 'hire-freelancers', label: 'Hire Freelancers', icon: UserCheck },
     { id: 'bookings', label: 'Bookings', icon: Calendar },
     { id: 'messages', label: 'Messages', icon: MessageSquare },
+    { id: 'features', label: 'Features', icon: Award },
     { id: 'notifications', label: 'Notifications', icon: Bell }
   ];
 
@@ -2300,6 +2305,81 @@ const ProviderDashboard = () => {
     </div>
   );
 
+  const renderFeatures = () => (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <h2 className="text-3xl font-bold text-slate-900">Features</h2>
+        <div className="flex items-center space-x-2 text-slate-600">
+          <Award className="w-6 h-6" />
+          <span className="text-lg">Premium Tools</span>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Certificate Generation Card */}
+        <Link href="/certificate">
+          <PremiumCard className="p-6 cursor-pointer hover:shadow-lg transition-all duration-300 group h-full">
+            <div className="flex flex-col h-full">
+              <div className="flex items-center space-x-4 mb-4">
+                <div className="flex-shrink-0">
+                  <div className="w-12 h-12 bg-gradient-to-r from-amber-500 to-yellow-600 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform duration-300">
+                    <Award className="w-6 h-6 text-white" />
+                  </div>
+                </div>
+                <div className="flex-1">
+                  <h3 className="text-lg font-bold text-slate-900 mb-1">Certificate Generator</h3>
+                  <p className="text-slate-600 text-sm">
+                    Create professional certificates for your events and services
+                  </p>
+                </div>
+                <div className="flex-shrink-0">
+                  <ArrowRight className="w-5 h-5 text-slate-400 group-hover:text-amber-600 transition-colors" />
+                </div>
+              </div>
+              <div className="flex-1 flex items-end">
+                <div className="flex items-center space-x-4 text-xs text-slate-500 w-full">
+                  <div className="flex items-center space-x-1">
+                    <CheckCircle className="w-3 h-3" />
+                    <span>PDF & PNG</span>
+                  </div>
+                  <div className="flex items-center space-x-1">
+                    <CheckCircle className="w-3 h-3" />
+                    <span>Custom Design</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </PremiumCard>
+        </Link>
+
+        {/* Placeholder for future features */}
+        <PremiumCard className="p-6 h-full">
+          <div className="flex flex-col h-full">
+            <div className="flex items-center space-x-4 mb-4">
+              <div className="flex-shrink-0">
+                <div className="w-12 h-12 bg-gradient-to-r from-indigo-500 to-purple-600 rounded-xl flex items-center justify-center">
+                  <Sparkles className="w-6 h-6 text-white" />
+                </div>
+              </div>
+              <div className="flex-1">
+                <h3 className="text-lg font-bold text-slate-900 mb-1">More Features Coming Soon</h3>
+                <p className="text-slate-600 text-sm">
+                  We're constantly adding new premium features to enhance your business management experience.
+                </p>
+              </div>
+            </div>
+            <div className="flex-1 flex items-end">
+              <div className="flex items-center space-x-2 text-sm text-slate-500">
+                <Clock className="w-4 h-4" />
+                <span>Stay tuned for updates</span>
+              </div>
+            </div>
+          </div>
+        </PremiumCard>
+      </div>
+    </div>
+  );
+
   const renderNotifications = () => (
     <div className="space-y-6">
       <h2 className="text-2xl font-bold text-gray-900">Notifications</h2>
@@ -2327,6 +2407,8 @@ const ProviderDashboard = () => {
         return renderBookings();
       case 'messages':
         return renderMessages();
+      case 'features':
+        return renderFeatures();
       case 'notifications':
         return renderNotifications();
       default:
