@@ -22,6 +22,7 @@ import {
 import Link from 'next/link';
 import PremiumButton from '../../../../components/ui/PremiumButton';
 import PremiumCard from '../../../../components/ui/PremiumCard';
+import IDCardGenerator from '../../../../components/ui/IDCardGenerator';
 import { api } from '../../../../lib/api';
 import { useAuth } from '../../../../contexts/AuthContext';
 import toast from 'react-hot-toast';
@@ -58,6 +59,7 @@ const ManageServicesPage = () => {
 
   const [editingService, setEditingService] = useState(null);
   const [showAddForm, setShowAddForm] = useState(false);
+  const [showIDGenerator, setShowIDGenerator] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
     description: '',
@@ -463,9 +465,12 @@ const ManageServicesPage = () => {
                   </div>
 
                   <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">
-                      Service Features
-                    </label>
+                    <div className="flex items-center justify-between">
+                      <label className="block text-sm font-semibold text-gray-700 mb-2">
+                        Service Features
+                      </label>
+                      <button type="button" onClick={() => setShowIDGenerator(true)} className="text-sm px-3 py-1 bg-indigo-50 text-indigo-700 rounded-md">ID Card</button>
+                    </div>
                     <div className="space-y-3">
                       {formData.features.map((feature, index) => (
                         <div key={index} className="flex items-center space-x-3">
@@ -527,6 +532,19 @@ const ManageServicesPage = () => {
                     </PremiumButton>
                   </div>
                 </form>
+
+                {/* ID Card Generator Modal (opened from Service Features) */}
+                {showIDGenerator && (
+                  <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+                    <PremiumCard className="w-full max-w-3xl p-6">
+                      <div className="flex items-center justify-between mb-4">
+                        <h3 className="text-xl font-bold text-gray-900">ID Card Generator</h3>
+                        <button onClick={() => setShowIDGenerator(false)} className="text-gray-500 hover:text-gray-700">Close</button>
+                      </div>
+                      <IDCardGenerator />
+                    </PremiumCard>
+                  </div>
+                )}
               </div>
             </PremiumCard>
           </motion.div>
