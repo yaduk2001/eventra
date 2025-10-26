@@ -14,6 +14,7 @@ import {
   Clock,
   CheckCircle,
   AlertCircle,
+  Cloud,
   Heart,
   Share,
   Eye,
@@ -95,6 +96,13 @@ const CustomerDashboard = () => {
   const [categoryFilter, setCategoryFilter] = useState('all');
   const [isBookingInProgress, setIsBookingInProgress] = useState(false);
   const [bookingServiceId, setBookingServiceId] = useState(null);
+  const [showEventDetailsModal, setShowEventDetailsModal] = useState(false);
+  const [selectedEventDetails, setSelectedEventDetails] = useState(null);
+
+  // Weather state
+  const [weatherData, setWeatherData] = useState(null);
+  const [weatherLoading, setWeatherLoading] = useState(false);
+  const [weatherError, setWeatherError] = useState(null);
 
   const { user, userProfile, logout } = useAuth();
   const router = useRouter();
@@ -593,6 +601,51 @@ const CustomerDashboard = () => {
   };
 
   // Handle event deletion
+  const handleViewEventDetails = async (event) => {
+    setSelectedEventDetails(event);
+    setShowEventDetailsModal(true);
+
+    // Fetch weather data for the event (only for accepted events)
+    if (event.status === 'awarded') {
+      setWeatherLoading(true);
+      setWeatherError(null);
+      setWeatherData(null);
+
+      try {
+        // Format event date to YYYY-MM-DD format to avoid timezone issues
+        let formattedEventDate = null;
+        if (event.eventDate) {
+          console.log('Frontend - Original event date:', event.eventDate);
+          console.log('Frontend - Event date type:', typeof event.eventDate);
+
+          const eventDate = new Date(event.eventDate);
+          // Set to noon to avoid timezone edge cases
+          eventDate.setHours(12, 0, 0, 0);
+          formattedEventDate = eventDate.toISOString().split('T')[0];
+
+          // Check if event date is in the future and within forecast range
+          const now = new Date();
+          const daysDiff = Math.ceil((eventDate.getTime() - now.getTime()) / (24 * 60 * 60 * 1000));
+          console.log('Frontend - Event date is', daysDiff, 'days from now');
+          console.log('Frontend - Current date:', now.toISOString().split('T')[0]);
+          console.log('Frontend - Event date:', eventDate.toISOString().split('T')[0]);
+
+          console.log('Frontend - Formatted event date:', formattedEventDate);
+          console.log('Frontend - Event date object:', eventDate);
+          console.log('Frontend - Event date ISO string:', eventDate.toISOString());
+        }
+
+        const response = await api.getWeather(event.location, formattedEventDate);
+        setWeatherData(response.data);
+      } catch (error) {
+        console.error('Error fetching weather:', error);
+        setWeatherError(error.message || 'Failed to fetch weather data');
+      } finally {
+        setWeatherLoading(false);
+      }
+    }
+  };
+
   const handleDeleteEvent = async (requestId) => {
     try {
       // Find the specific bid request to check actual bid count
@@ -879,10 +932,10 @@ const CustomerDashboard = () => {
         </div>
       </div>
 
-      {/* Bid Requests Section */}
+      {/* My Events Section */}
       {loading && (
         <div className="space-y-4">
-          <h3 className="text-xl font-semibold text-slate-800">Active My Events</h3>
+          <h3 className="text-xl font-semibold text-slate-800">My Events</h3>
           <div className="text-center py-8">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600 mx-auto"></div>
             <p className="text-slate-600 mt-2">Loading your events...</p>
@@ -891,167 +944,357 @@ const CustomerDashboard = () => {
       )}
 
       {!loading && bidRequests.length > 0 && (
-        <div className="space-y-4">
-          <h3 className="text-xl font-semibold text-slate-800">Active My Events</h3>
-          <div className="grid grid-cols-1 gap-6">
-            {bidRequests.map((request, index) => (
-              <motion.div
-                key={request.id}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.5, delay: index * 0.1 }}
-              >
-                <PremiumCard className="p-6" hoverEffect="lift">
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1">
-                      <div className="flex items-center space-x-3 mb-4">
-                        <div className="w-12 h-12 bg-gradient-to-r from-blue-100 to-indigo-100 rounded-lg flex items-center justify-center">
-                          <Target className="w-6 h-6 text-blue-600" />
-                        </div>
-                        <div>
-                          <h3 className="text-lg font-bold text-slate-900">{request.eventName || `${request.eventType} Event`}</h3>
-                          <p className="text-slate-600">{request.bids?.length || 0} bids received</p>
-                        </div>
-                      </div>
-
-                      <div className="grid grid-cols-2 gap-4 mb-4">
-                        <div className="flex items-center space-x-2 text-slate-600">
-                          <Calendar className="w-4 h-4" />
-                          <span>{new Date(request.eventDate).toLocaleDateString()}</span>
-                        </div>
-                        <div className="flex items-center space-x-2 text-slate-600">
-                          <MapPin className="w-4 h-4" />
-                          <span>{request.location}</span>
-                        </div>
-                        <div className="flex items-center space-x-2 text-slate-600">
-                          {/* currency icon removed per request */}
-                          <span className="font-semibold">Budget: ₹{request.budget}</span>
-                        </div>
-                        <div className="flex items-center space-x-2 text-slate-600">
-                          <User className="w-4 h-4" />
-                          <span>{request.guestCount} guests</span>
-                        </div>
-                      </div>
-
-                      {request.requirements && (
-                        <p className="text-slate-600 mb-4 text-sm bg-slate-50 p-3 rounded-lg">
-                          <strong>Requirements:</strong> {request.requirements}
-                        </p>
-                      )}
-                    </div>
-
-                    <div className="text-right">
-                      <div className={`px-3 py-1 rounded-full text-sm font-semibold mb-2 ${request.status === 'open'
-                        ? 'bg-green-100 text-green-700'
-                        : request.status === 'awarded'
-                          ? 'bg-blue-100 text-blue-700'
-                          : 'bg-gray-100 text-gray-700'
-                        }`}>
-                        {request.status}
-                      </div>
-
-                      {/* Delete button - only show for open events */}
-                      {request.status === 'open' && (
-                        <div className="mt-2">
-                          <PremiumButton
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleDeleteEvent(request.id)}
-                            className="text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200 hover:border-red-300"
-                          >
-                            <Trash2 className="w-4 h-4 mr-1" />
-                            Delete
-                          </PremiumButton>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Bids Section */}
-                  {request.bids && request.bids.length > 0 && (
-                    <div className="mt-6 border-t pt-4">
-                      <h4 className="font-semibold text-slate-800 mb-3">Received Bids:</h4>
-                      <div className="space-y-3">
-                        {request.bids.map((bid, bidIndex) => (
-                          <div key={bidIndex} className="bg-slate-50 p-4 rounded-lg">
-                            <div className="flex items-center justify-between mb-2">
-                              <div className="flex items-center space-x-3">
-                                <div className="w-8 h-8 bg-indigo-100 rounded-full flex items-center justify-center">
-                                  <User className="w-4 h-4 text-indigo-600" />
-                                </div>
-                                <div>
-                                  <p className="font-semibold text-slate-900">{bid.providerName}</p>
-                                  <p className="text-sm text-slate-600">{bid.providerRole}</p>
-                                </div>
-                              </div>
-                              <div className="text-right">
-                                <p className="text-lg font-bold text-indigo-600">₹{bid.price}</p>
-                                <div className={`px-2 py-1 rounded text-xs font-semibold ${bid.status === 'pending'
-                                  ? 'bg-yellow-100 text-yellow-700'
-                                  : bid.status === 'accepted'
-                                    ? 'bg-green-100 text-green-700'
-                                    : 'bg-red-100 text-red-700'
-                                  }`}>
-                                  {bid.status}
-                                </div>
-                              </div>
+        <div className="space-y-8">
+          {/* Open Events */}
+          {bidRequests.filter(request => request.status === 'open').length > 0 && (
+            <div className="space-y-4">
+              <h3 className="text-xl font-semibold text-slate-800">Open Events</h3>
+              <div className="grid grid-cols-1 gap-6">
+                {bidRequests.filter(request => request.status === 'open').map((request, index) => (
+                  <motion.div
+                    key={request.id}
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.5, delay: index * 0.1 }}
+                  >
+                    <PremiumCard className="p-6" hoverEffect="lift">
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1">
+                          <div className="flex items-center space-x-3 mb-4">
+                            <div className="w-12 h-12 bg-gradient-to-r from-green-100 to-emerald-100 rounded-lg flex items-center justify-center">
+                              <Target className="w-6 h-6 text-green-600" />
                             </div>
+                            <div>
+                              <h3 className="text-lg font-bold text-slate-900">{request.eventName || `${request.eventType} Event`}</h3>
+                              <p className="text-slate-600">{request.bids?.length || 0} bids received</p>
+                            </div>
+                          </div>
 
-                            <p className="text-slate-700 text-sm mb-3">{bid.description}</p>
+                          <div className="grid grid-cols-2 gap-4 mb-4">
+                            <div className="flex items-center space-x-2 text-slate-600">
+                              <Calendar className="w-4 h-4" />
+                              <span>{new Date(request.eventDate).toLocaleDateString()}</span>
+                            </div>
+                            <div className="flex items-center space-x-2 text-slate-600">
+                              <MapPin className="w-4 h-4" />
+                              <span>{request.location}</span>
+                            </div>
+                            <div className="flex items-center space-x-2 text-slate-600">
+                              <span className="font-semibold">Budget: ₹{request.budget}</span>
+                            </div>
+                            <div className="flex items-center space-x-2 text-slate-600">
+                              <User className="w-4 h-4" />
+                              <span>{request.guestCount} guests</span>
+                            </div>
+                          </div>
 
-                            {bid.estimatedTime && (
-                              <p className="text-slate-600 text-xs mb-3">
-                                <Clock className="w-3 h-3 inline mr-1" />
-                                Estimated time: {bid.estimatedTime}
-                              </p>
-                            )}
+                          {request.requirements && (
+                            <p className="text-slate-600 mb-4 text-sm bg-slate-50 p-3 rounded-lg">
+                              <strong>Requirements:</strong> {request.requirements}
+                            </p>
+                          )}
+                        </div>
 
-                            {bid.status === 'pending' && request.status === 'open' && (
-                              <div className="flex space-x-2">
-                                <Link href={`/provider/profile?id=${bid.providerId}`}>
+                        <div className="text-right">
+                          <div className="px-3 py-1 rounded-full text-sm font-semibold mb-2 bg-green-100 text-green-700">
+                            {request.status}
+                          </div>
+                          <div className="mt-2 space-y-2">
+                            <PremiumButton
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleViewEventDetails(request)}
+                              className="w-full"
+                            >
+                              <Eye className="w-4 h-4 mr-1" />
+                              View Details
+                            </PremiumButton>
+                            <PremiumButton
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleDeleteEvent(request.id)}
+                              className="text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200 hover:border-red-300 w-full"
+                            >
+                              <Trash2 className="w-4 h-4 mr-1" />
+                              Delete
+                            </PremiumButton>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Bids Section */}
+                      {request.bids && request.bids.length > 0 && (
+                        <div className="mt-6 border-t pt-4">
+                          <h4 className="font-semibold text-slate-800 mb-3">Received Bids:</h4>
+                          <div className="space-y-3">
+                            {request.bids.map((bid, bidIndex) => (
+                              <div key={bidIndex} className="bg-slate-50 p-4 rounded-lg">
+                                <div className="flex items-center justify-between mb-2">
+                                  <div className="flex items-center space-x-3">
+                                    <div className="w-8 h-8 bg-indigo-100 rounded-full flex items-center justify-center">
+                                      <User className="w-4 h-4 text-indigo-600" />
+                                    </div>
+                                    <div>
+                                      <p className="font-semibold text-slate-900">{bid.providerName}</p>
+                                      <p className="text-sm text-slate-600">{bid.providerRole}</p>
+                                    </div>
+                                  </div>
+                                  <div className="text-right">
+                                    <p className="text-lg font-bold text-indigo-600">₹{bid.price}</p>
+                                    <div className={`px-2 py-1 rounded text-xs font-semibold ${bid.status === 'pending'
+                                      ? 'bg-yellow-100 text-yellow-700'
+                                      : bid.status === 'accepted'
+                                        ? 'bg-green-100 text-green-700'
+                                        : 'bg-red-100 text-red-700'
+                                      }`}>
+                                      {bid.status}
+                                    </div>
+                                  </div>
+                                </div>
+
+                                <p className="text-slate-700 text-sm mb-3">{bid.description}</p>
+
+                                {bid.estimatedTime && (
+                                  <p className="text-slate-600 text-xs mb-3">
+                                    <Clock className="w-3 h-3 inline mr-1" />
+                                    Estimated time: {bid.estimatedTime}
+                                  </p>
+                                )}
+
+                                {bid.status === 'pending' && (
+                                  <div className="flex space-x-2">
+                                    <Link href={`/provider/profile?id=${bid.providerId}`}>
+                                      <PremiumButton
+                                        variant="ghost"
+                                        size="sm"
+                                      >
+                                        <Eye className="w-4 h-4 mr-1" />
+                                        View Profile
+                                      </PremiumButton>
+                                    </Link>
+                                    <PremiumButton
+                                      variant="primary"
+                                      size="sm"
+                                      onClick={() => handleAcceptBid(request.id, bid.providerId)}
+                                    >
+                                      <CheckCircle className="w-4 h-4 mr-1" />
+                                      Accept
+                                    </PremiumButton>
+                                    <PremiumButton
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() => handleRejectBid(request.id, bid.providerId)}
+                                      className="text-red-600 hover:text-red-700"
+                                    >
+                                      <XCircle className="w-4 h-4 mr-1" />
+                                      Reject
+                                    </PremiumButton>
+                                  </div>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {request.bids?.length === 0 && (
+                        <div className="mt-6 border-t pt-4 text-center text-slate-500">
+                          <AlertCircle className="w-8 h-8 mx-auto mb-2" />
+                          <p>No bids received yet. Providers will submit their proposals soon.</p>
+                        </div>
+                      )}
+                    </PremiumCard>
+                  </motion.div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Accepted Events */}
+          {bidRequests.filter(request => request.status === 'awarded').length > 0 && (
+            <div className="space-y-4">
+              <h3 className="text-xl font-semibold text-slate-800">Accepted Events</h3>
+              <div className="grid grid-cols-1 gap-6">
+                {bidRequests.filter(request => request.status === 'awarded').map((request, index) => (
+                  <motion.div
+                    key={request.id}
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.5, delay: index * 0.1 }}
+                  >
+                    <PremiumCard className="p-6" hoverEffect="lift">
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1">
+                          <div className="flex items-center space-x-3 mb-4">
+                            <div className="w-12 h-12 bg-gradient-to-r from-blue-100 to-indigo-100 rounded-lg flex items-center justify-center">
+                              <CheckCircle className="w-6 h-6 text-blue-600" />
+                            </div>
+                            <div>
+                              <h3 className="text-lg font-bold text-slate-900">{request.eventName || `${request.eventType} Event`}</h3>
+                              <p className="text-slate-600">Service provider assigned</p>
+                            </div>
+                          </div>
+
+                          <div className="grid grid-cols-2 gap-4 mb-4">
+                            <div className="flex items-center space-x-2 text-slate-600">
+                              <Calendar className="w-4 h-4" />
+                              <span>{new Date(request.eventDate).toLocaleDateString()}</span>
+                            </div>
+                            <div className="flex items-center space-x-2 text-slate-600">
+                              <MapPin className="w-4 h-4" />
+                              <span>{request.location}</span>
+                            </div>
+                            <div className="flex items-center space-x-2 text-slate-600">
+                              <span className="font-semibold">Budget: ₹{request.budget}</span>
+                            </div>
+                            <div className="flex items-center space-x-2 text-slate-600">
+                              <User className="w-4 h-4" />
+                              <span>{request.guestCount} guests</span>
+                            </div>
+                          </div>
+
+                          {request.requirements && (
+                            <p className="text-slate-600 mb-4 text-sm bg-slate-50 p-3 rounded-lg">
+                              <strong>Requirements:</strong> {request.requirements}
+                            </p>
+                          )}
+                        </div>
+
+                        <div className="text-right">
+                          <div className="px-3 py-1 rounded-full text-sm font-semibold mb-2 bg-blue-100 text-blue-700">
+                            {request.status}
+                          </div>
+                          <div className="mt-2">
+                            <PremiumButton
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleViewEventDetails(request)}
+                              className="w-full"
+                            >
+                              <Eye className="w-4 h-4 mr-1" />
+                              View Details
+                            </PremiumButton>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Accepted Bid Section */}
+                      {request.bids && request.bids.length > 0 && (
+                        <div className="mt-6 border-t pt-4">
+                          <h4 className="font-semibold text-slate-800 mb-3">Assigned Provider:</h4>
+                          {request.bids.filter(bid => bid.status === 'accepted').map((bid, bidIndex) => (
+                            <div key={bidIndex} className="bg-green-50 p-4 rounded-lg border border-green-200">
+                              <div className="flex items-center justify-between mb-2">
+                                <div className="flex items-center space-x-3">
+                                  <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center">
+                                    <User className="w-4 h-4 text-green-600" />
+                                  </div>
+                                  <div>
+                                    <p className="font-semibold text-slate-900">{bid.providerName}</p>
+                                    <p className="text-sm text-slate-600">{bid.providerRole}</p>
+                                  </div>
                                   <PremiumButton
-                                    variant="ghost"
+                                    variant="outline"
                                     size="sm"
+                                    className="ml-2 border-green-300 text-green-700 hover:bg-green-100 hover:border-green-400"
+                                    onClick={() => router.push(`/provider/profile?id=${bid.providerId}`)}
                                   >
-                                    <Eye className="w-4 h-4 mr-1" />
+                                    <User className="w-3 h-3 mr-1 text-green-600" />
                                     View Profile
                                   </PremiumButton>
-                                </Link>
-                                <PremiumButton
-                                  variant="primary"
-                                  size="sm"
-                                  onClick={() => handleAcceptBid(request.id, bid.providerId)}
-                                >
-                                  <CheckCircle className="w-4 h-4 mr-1" />
-                                  Accept
-                                </PremiumButton>
-                                <PremiumButton
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => handleRejectBid(request.id, bid.providerId)}
-                                  className="text-red-600 hover:text-red-700"
-                                >
-                                  <XCircle className="w-4 h-4 mr-1" />
-                                  Reject
-                                </PremiumButton>
+                                </div>
+                                <div className="text-right">
+                                  <p className="text-lg font-bold text-green-600">₹{bid.price}</p>
+                                  <div className="px-2 py-1 rounded text-xs font-semibold bg-green-100 text-green-700">
+                                    {bid.status}
+                                  </div>
+                                </div>
                               </div>
-                            )}
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
+                              <p className="text-slate-700 text-sm mb-3">{bid.description}</p>
+                              {bid.estimatedTime && (
+                                <p className="text-slate-600 text-xs">
+                                  <Clock className="w-3 h-3 inline mr-1" />
+                                  Estimated time: {bid.estimatedTime}
+                                </p>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </PremiumCard>
+                  </motion.div>
+                ))}
+              </div>
+            </div>
+          )}
 
-                  {request.bids?.length === 0 && (
-                    <div className="mt-6 border-t pt-4 text-center text-slate-500">
-                      <AlertCircle className="w-8 h-8 mx-auto mb-2" />
-                      <p>No bids received yet. Providers will submit their proposals soon.</p>
-                    </div>
-                  )}
-                </PremiumCard>
-              </motion.div>
-            ))}
-          </div>
+          {/* Completed Events */}
+          {bidRequests.filter(request => request.status === 'completed').length > 0 && (
+            <div className="space-y-4">
+              <h3 className="text-xl font-semibold text-slate-800">Completed Events</h3>
+              <div className="grid grid-cols-1 gap-6">
+                {bidRequests.filter(request => request.status === 'completed').map((request, index) => (
+                  <motion.div
+                    key={request.id}
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.5, delay: index * 0.1 }}
+                  >
+                    <PremiumCard className="p-6" hoverEffect="lift">
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1">
+                          <div className="flex items-center space-x-3 mb-4">
+                            <div className="w-12 h-12 bg-gradient-to-r from-purple-100 to-indigo-100 rounded-lg flex items-center justify-center">
+                              <Award className="w-6 h-6 text-purple-600" />
+                            </div>
+                            <div>
+                              <h3 className="text-lg font-bold text-slate-900">{request.eventName || `${request.eventType} Event`}</h3>
+                              <p className="text-slate-600">Event completed successfully</p>
+                            </div>
+                          </div>
+
+                          <div className="grid grid-cols-2 gap-4 mb-4">
+                            <div className="flex items-center space-x-2 text-slate-600">
+                              <Calendar className="w-4 h-4" />
+                              <span>{new Date(request.eventDate).toLocaleDateString()}</span>
+                            </div>
+                            <div className="flex items-center space-x-2 text-slate-600">
+                              <MapPin className="w-4 h-4" />
+                              <span>{request.location}</span>
+                            </div>
+                            <div className="flex items-center space-x-2 text-slate-600">
+                              <span className="font-semibold">Budget: ₹{request.budget}</span>
+                            </div>
+                            <div className="flex items-center space-x-2 text-slate-600">
+                              <User className="w-4 h-4" />
+                              <span>{request.guestCount} guests</span>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="text-right">
+                          <div className="px-3 py-1 rounded-full text-sm font-semibold mb-2 bg-purple-100 text-purple-700">
+                            {request.status}
+                          </div>
+                          <div className="mt-2">
+                            <PremiumButton
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleViewEventDetails(request)}
+                              className="w-full"
+                            >
+                              <Eye className="w-4 h-4 mr-1" />
+                              View Details
+                            </PremiumButton>
+                          </div>
+                        </div>
+                      </div>
+                    </PremiumCard>
+                  </motion.div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       )}
 
@@ -2564,6 +2807,317 @@ const CustomerDashboard = () => {
                 </PremiumButton>
               </div>
             </form>
+          </motion.div>
+        </div>
+      )}
+
+      {/* Event Details Modal */}
+      {showEventDetailsModal && selectedEventDetails && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <motion.div
+            className="bg-white rounded-2xl p-8 max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto"
+            initial={{ scale: 0.9, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            transition={{ duration: 0.2 }}
+          >
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-2xl font-bold text-gray-900">Event Details</h2>
+              <button
+                onClick={() => {
+                  setShowEventDetailsModal(false);
+                  setSelectedEventDetails(null);
+                  setWeatherData(null);
+                  setWeatherError(null);
+                }}
+                className="text-gray-400 hover:text-gray-600 transition-colors"
+              >
+                <XCircle className="w-6 h-6" />
+              </button>
+            </div>
+
+            <div className="space-y-6">
+              {/* Event Basic Info */}
+              <div className="bg-slate-50 p-6 rounded-xl">
+                <h3 className="text-xl font-bold text-gray-900 mb-4">
+                  {selectedEventDetails.eventName || `${selectedEventDetails.eventType} Event`}
+                </h3>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="flex items-center space-x-3">
+                    <Calendar className="w-5 h-5 text-indigo-600" />
+                    <div>
+                      <p className="text-sm text-gray-600">Event Date</p>
+                      <p className="font-semibold text-black">{new Date(selectedEventDetails.eventDate).toLocaleDateString()}</p>
+                    </div>
+                  </div>
+                  
+                  <div className="flex items-center space-x-3">
+                    <MapPin className="w-5 h-5 text-indigo-600" />
+                    <div>
+                      <p className="text-sm text-gray-600">Location</p>
+                      <p className="font-semibold text-black">{selectedEventDetails.location}</p>
+                    </div>
+                  </div>
+                  
+                  <div className="flex items-center space-x-3">
+                    <DollarSign className="w-5 h-5 text-indigo-600" />
+                    <div>
+                      <p className="text-sm text-gray-600">Budget</p>
+                      <p className="font-semibold text-black">₹{selectedEventDetails.budget}</p>
+                    </div>
+                  </div>
+                  
+                  <div className="flex items-center space-x-3">
+                    <User className="w-5 h-5 text-indigo-600" />
+                    <div>
+                      <p className="text-sm text-gray-600">Guest Count</p>
+                      <p className="font-semibold text-black">{selectedEventDetails.guestCount} guests</p>
+                    </div>
+                  </div>
+                </div>
+
+                {selectedEventDetails.requirements && (
+                  <div className="mt-4">
+                    <p className="text-sm text-gray-600 mb-2">Requirements</p>
+                    <p className="text-black">
+                      {selectedEventDetails.requirements}
+                    </p>
+                  </div>
+                )}
+
+                <div className="mt-4">
+                  <div className="flex items-center space-x-2">
+                    <div className={`px-3 py-1 rounded-full text-sm font-semibold ${
+                      selectedEventDetails.status === 'open' ? 'bg-green-100 text-green-700' :
+                      selectedEventDetails.status === 'awarded' ? 'bg-blue-100 text-blue-700' :
+                      selectedEventDetails.status === 'completed' ? 'bg-purple-100 text-purple-700' :
+                      'bg-gray-100 text-gray-700'
+                    }`}>
+                      {selectedEventDetails.status}
+                    </div>
+                    <span className="text-sm text-gray-600">
+                      Created on {new Date(selectedEventDetails.createdAt).toLocaleDateString()}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Bids Section */}
+              {selectedEventDetails.bids && selectedEventDetails.bids.length > 0 && (
+                <div>
+                  <h4 className="text-lg font-semibold text-gray-900 mb-4">
+                    {selectedEventDetails.status === 'awarded' ? 'Assigned Provider' : 'Received Bids'} 
+                    ({selectedEventDetails.bids.length})
+                  </h4>
+                  
+                  <div className="space-y-4">
+                    {selectedEventDetails.bids.map((bid, index) => (
+                      <div 
+                        key={index} 
+                        className={`p-4 rounded-lg border ${
+                          bid.status === 'accepted' 
+                            ? 'bg-green-50 border-green-200' 
+                            : bid.status === 'rejected'
+                            ? 'bg-red-50 border-red-200'
+                            : 'bg-gray-50 border-gray-200'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between mb-3">
+                          <div className="flex items-center space-x-3">
+                            <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
+                              bid.status === 'accepted' ? 'bg-green-100' :
+                              bid.status === 'rejected' ? 'bg-red-100' : 'bg-indigo-100'
+                            }`}>
+                              <User className={`w-5 h-5 ${
+                                bid.status === 'accepted' ? 'text-green-600' :
+                                bid.status === 'rejected' ? 'text-red-600' : 'text-indigo-600'
+                              }`} />
+                            </div>
+                            <div>
+                              <p className="font-semibold text-gray-900">{bid.providerName}</p>
+                              <p className="text-sm text-gray-600">{bid.providerRole}</p>
+                            </div>
+                          </div>
+                          
+                          <div className="text-right">
+                            <p className="text-xl font-bold text-indigo-600">₹{bid.price}</p>
+                            <div className={`px-2 py-1 rounded text-xs font-semibold ${
+                              bid.status === 'pending' ? 'bg-yellow-100 text-yellow-700' :
+                              bid.status === 'accepted' ? 'bg-green-100 text-green-700' :
+                              'bg-red-100 text-red-700'
+                            }`}>
+                              {bid.status}
+                            </div>
+                          </div>
+                        </div>
+                        
+                        <p className="text-gray-700 mb-2">{bid.description}</p>
+                        
+                        {bid.estimatedTime && (
+                          <div className="flex items-center text-sm text-gray-600">
+                            <Clock className="w-4 h-4 mr-1" />
+                            Estimated time: {bid.estimatedTime}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Weather Forecast Section - Only for accepted events */}
+              {selectedEventDetails.status === 'awarded' && (
+                <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg p-4">
+                  <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
+                    <Cloud className="w-5 h-5 mr-2 text-blue-600" />
+                    Weather Forecast
+                  </h3>
+
+                  {weatherLoading && (
+                    <div className="flex items-center justify-center py-8">
+                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                      <span className="ml-2 text-gray-600">Loading weather data...</span>
+                    </div>
+                  )}
+
+                  {weatherError && (
+                    <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                      <div className="flex items-center">
+                        <AlertCircle className="w-5 h-5 text-red-600 mr-2" />
+                        <span className="text-red-800 font-medium">Weather Unavailable</span>
+                      </div>
+                      <p className="text-red-700 text-sm mt-1">{weatherError}</p>
+                    </div>
+                  )}
+
+                  {weatherData && !weatherLoading && (
+                    <div className="space-y-4">
+                      {/* Event Day Forecast - Priority Display */}
+                      {weatherData.forecast ? (
+                        <div className={`rounded-lg p-4 ${weatherData.forecast.isExactDate ? 'bg-green-50' : 'bg-yellow-50'}`}>
+                          <h4 className="font-semibold text-gray-900 mb-3">
+                            {weatherData.forecast.isExactDate
+                              ? (weatherData.forecast.date ? `Forecast for ${weatherData.forecast.date}` : 'Event Day Forecast')
+                              : (weatherData.forecast.date ? `Closest Available Forecast for ${weatherData.forecast.date}` : 'Closest Available Forecast')
+                            }
+                          </h4>
+                          {!weatherData.forecast.isExactDate && (
+                            <div className="mb-3 p-2 bg-yellow-100 rounded text-yellow-800 text-sm">
+                              <AlertCircle className="w-4 h-4 inline mr-1" />
+                              This is the closest available forecast to your event date.
+                            </div>
+                          )}
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center">
+                              <img
+                                src={`https://openweathermap.org/img/wn/${weatherData.forecast.icon}@2x.png`}
+                                alt={weatherData.forecast.description}
+                                className="w-16 h-16"
+                              />
+                              <div>
+                                <p className="text-2xl font-bold text-gray-900">
+                                  {weatherData.forecast.temperature}°C
+                                </p>
+                                <p className="text-sm text-gray-600 capitalize">
+                                  {weatherData.forecast.description}
+                                </p>
+                                <p className="text-xs text-gray-500">
+                                  {weatherData.forecast.time}
+                                </p>
+                              </div>
+                            </div>
+                            <div className="text-right text-sm text-gray-600">
+                              <p>Feels like {weatherData.forecast.feelsLike}°C</p>
+                              <p>Humidity: {weatherData.forecast.humidity}%</p>
+                              <p>Wind: {weatherData.forecast.windSpeed} km/h</p>
+                            </div>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="bg-yellow-50 rounded-lg p-4">
+                          <div className="flex items-center">
+                            <AlertCircle className="w-5 h-5 text-yellow-600 mr-2" />
+                            <span className="text-yellow-800 font-medium">Event Day Forecast Not Available</span>
+                          </div>
+                          <p className="text-yellow-700 text-sm mt-1">
+                            {selectedEventDetails?.eventDate ? (() => {
+                              const eventDate = new Date(selectedEventDetails.eventDate);
+                              const now = new Date();
+                              const daysDiff = Math.ceil((eventDate.getTime() - now.getTime()) / (24 * 60 * 60 * 1000));
+
+                              if (daysDiff < 0) {
+                                return `The event date ${eventDate.toLocaleDateString()} has already passed. Showing current conditions instead.`;
+                              } else if (daysDiff > 5) {
+                                return `Forecast data for ${eventDate.toLocaleDateString()} is not available. Weather forecasts are only available for the next 5 days. Showing the closest available forecast instead.`;
+                              } else {
+                                return `Forecast data for ${eventDate.toLocaleDateString()} is not available. Showing the closest available forecast instead.`;
+                              }
+                            })() :
+                              'Forecast data for the event date is not available. Showing the closest available forecast instead.'
+                            }
+                          </p>
+                        </div>
+                      )}
+
+                      {/* Current Weather - Secondary Display */}
+                      <div className="bg-blue-50 rounded-lg p-4">
+                        <h4 className="font-semibold text-gray-900 mb-3">Current Conditions</h4>
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center">
+                            <img
+                              src={`https://openweathermap.org/img/wn/${weatherData.current.icon}@2x.png`}
+                              alt={weatherData.current.description}
+                              className="w-12 h-12"
+                            />
+                            <div>
+                              <p className="text-xl font-bold text-gray-900">
+                                {weatherData.current.temperature}°C
+                              </p>
+                              <p className="text-sm text-gray-600 capitalize">
+                                {weatherData.current.description}
+                              </p>
+                            </div>
+                          </div>
+                          <div className="text-right text-sm text-gray-600">
+                            <p>Feels like {weatherData.current.feelsLike}°C</p>
+                            <p>Humidity: {weatherData.current.humidity}%</p>
+                            <p>Wind: {weatherData.current.windSpeed} km/h</p>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Location Info */}
+                      <div className="bg-gray-50 rounded-lg p-3">
+                        <p className="text-xs text-gray-500 text-center">
+                          Weather for {weatherData.location.name}, {weatherData.location.country}
+                        </p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {selectedEventDetails.bids?.length === 0 && (
+                <div className="text-center py-8 text-gray-500">
+                  <AlertCircle className="w-12 h-12 mx-auto mb-3 text-gray-300" />
+                  <p>No bids received yet for this event.</p>
+                </div>
+              )}
+            </div>
+
+            <div className="flex items-center justify-end space-x-4 pt-6 border-t border-gray-200 mt-6">
+              <PremiumButton
+                variant="ghost"
+                onClick={() => {
+                  setShowEventDetailsModal(false);
+                  setSelectedEventDetails(null);
+                  setWeatherData(null);
+                  setWeatherError(null);
+                }}
+              >
+                Close
+              </PremiumButton>
+            </div>
           </motion.div>
         </div>
       )}
