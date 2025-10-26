@@ -2561,7 +2561,7 @@ const ProviderDashboard = () => {
           </span>
         </div>
 
-        <nav className="flex-grow">
+        <nav className="flex-grow overflow-y-auto overflow-x-hidden">
           <ul className="space-y-2">
             {sidebarNavItems.map((item) => (
               <motion.li key={item.id} whileHover={{ x: 5 }} whileTap={{ scale: 0.98 }}>
