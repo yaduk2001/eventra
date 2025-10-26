@@ -42,7 +42,7 @@ import {
   RefreshCw,
   Award,
   ArrowRight,
-  Cloud
+  Camera,
 } from 'lucide-react';
 import PremiumButton from '../../../components/ui/PremiumButton';
 import PremiumCard from '../../../components/ui/PremiumCard';
@@ -127,10 +127,10 @@ const ProviderDashboard = () => {
   const [freelancerJobApplications, setFreelancerJobApplications] = useState([]);
   const [showFreelancerApplicationsModal, setShowFreelancerApplicationsModal] = useState(false);
   const [isCalculatingEndDate, setIsCalculatingEndDate] = useState(false);
-  
+
   // Booking details modal state
   const [showBookingDetailsModal, setShowBookingDetailsModal] = useState(false);
-  
+
   // Weather state (now integrated into booking details)
   const [weatherData, setWeatherData] = useState(null);
   const [weatherLoading, setWeatherLoading] = useState(false);
@@ -341,7 +341,7 @@ const ProviderDashboard = () => {
   const handleViewBookingDetails = async (booking) => {
     setSelectedBooking(booking);
     setShowBookingDetailsModal(true);
-    
+
     // Fetch weather data for the booking
     setWeatherLoading(true);
     setWeatherError(null);
@@ -353,19 +353,19 @@ const ProviderDashboard = () => {
       if (booking.eventDate) {
         console.log('Frontend - Original event date:', booking.eventDate);
         console.log('Frontend - Event date type:', typeof booking.eventDate);
-        
+
         const eventDate = new Date(booking.eventDate);
         // Set to noon to avoid timezone edge cases
         eventDate.setHours(12, 0, 0, 0);
         formattedEventDate = eventDate.toISOString().split('T')[0];
-        
+
         // Check if event date is in the future and within forecast range
         const now = new Date();
         const daysDiff = Math.ceil((eventDate.getTime() - now.getTime()) / (24 * 60 * 60 * 1000));
         console.log('Frontend - Event date is', daysDiff, 'days from now');
         console.log('Frontend - Current date:', now.toISOString().split('T')[0]);
         console.log('Frontend - Event date:', eventDate.toISOString().split('T')[0]);
-        
+
         console.log('Frontend - Formatted event date:', formattedEventDate);
         console.log('Frontend - Event date object:', eventDate);
         console.log('Frontend - Event date ISO string:', eventDate.toISOString());
@@ -2329,10 +2329,10 @@ const ProviderDashboard = () => {
                         <p className="text-sm text-gray-600">{booking.location || 'Location not specified'}</p>
                       </div>
                     </div>
-                    
+
                     <div className="flex justify-end gap-2">
-                      <PremiumButton 
-                        variant="ghost" 
+                      <PremiumButton
+                        variant="ghost"
                         size="sm"
                         onClick={() => handleViewBookingDetails(booking)}
                       >
@@ -2410,30 +2410,41 @@ const ProviderDashboard = () => {
           </PremiumCard>
         </Link>
 
-        {/* Placeholder for future features */}
-        <PremiumCard className="p-6 h-full">
-          <div className="flex flex-col h-full">
-            <div className="flex items-center space-x-4 mb-4">
-              <div className="flex-shrink-0">
-                <div className="w-12 h-12 bg-gradient-to-r from-indigo-500 to-purple-600 rounded-xl flex items-center justify-center">
-                  <Sparkles className="w-6 h-6 text-white" />
+        {/* ID Card Generator Card */}
+        <Link href="/provider/id-card">
+          <PremiumCard className="p-6 cursor-pointer hover:shadow-lg transition-all duration-300 group h-full">
+            <div className="flex flex-col h-full">
+              <div className="flex items-center space-x-4 mb-4">
+                <div className="flex-shrink-0">
+                  <div className="w-12 h-12 bg-gradient-to-r from-indigo-500 to-sky-500 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform duration-300">
+                    <Camera className="w-6 h-6 text-white" />
+                  </div>
+                </div>
+                <div className="flex-1">
+                  <h3 className="text-lg font-bold text-slate-900 mb-1">ID Card Generator</h3>
+                  <p className="text-slate-600 text-sm">
+                    Quickly create professional ID cards for event attendees. Upload a photo or use a URL, add a name and event, then download.
+                  </p>
+                </div>
+                <div className="flex-shrink-0">
+                  <ArrowRight className="w-5 h-5 text-slate-400 group-hover:text-indigo-600 transition-colors" />
                 </div>
               </div>
-              <div className="flex-1">
-                <h3 className="text-lg font-bold text-slate-900 mb-1">More Features Coming Soon</h3>
-                <p className="text-slate-600 text-sm">
-                  We're constantly adding new premium features to enhance your business management experience.
-                </p>
+              <div className="flex-1 flex items-end">
+                <div className="flex items-center space-x-4 text-xs text-slate-500 w-full">
+                  <div className="flex items-center space-x-1">
+                    <CheckCircle className="w-3 h-3" />
+                    <span>PNG Export</span>
+                  </div>
+                  <div className="flex items-center space-x-1">
+                    <CheckCircle className="w-3 h-3" />
+                    <span>Simple Design</span>
+                  </div>
+                </div>
               </div>
             </div>
-            <div className="flex-1 flex items-end">
-              <div className="flex items-center space-x-2 text-sm text-slate-500">
-                <Clock className="w-4 h-4" />
-                <span>Stay tuned for updates</span>
-              </div>
-            </div>
-          </div>
-        </PremiumCard>
+          </PremiumCard>
+        </Link>
       </div>
     </div>
   );
@@ -3547,18 +3558,17 @@ const ProviderDashboard = () => {
               <div className="space-y-6">
                 {/* Status Badge */}
                 <div className="flex items-center gap-3">
-                  <div className={`px-3 py-1 rounded-full text-sm font-medium ${
-                    selectedBooking.status === 'confirmed' ? 'bg-green-100 text-green-700' :
+                  <div className={`px-3 py-1 rounded-full text-sm font-medium ${selectedBooking.status === 'confirmed' ? 'bg-green-100 text-green-700' :
                     selectedBooking.status === 'in_progress' ? 'bg-blue-100 text-blue-700' :
-                    selectedBooking.status === 'completed' ? 'bg-purple-100 text-purple-700' :
-                    selectedBooking.status === 'cancelled' ? 'bg-red-100 text-red-700' :
-                    'bg-gray-100 text-gray-700'
-                  }`}>
+                      selectedBooking.status === 'completed' ? 'bg-purple-100 text-purple-700' :
+                        selectedBooking.status === 'cancelled' ? 'bg-red-100 text-red-700' :
+                          'bg-gray-100 text-gray-700'
+                    }`}>
                     {selectedBooking.status === 'confirmed' ? 'Confirmed' :
-                     selectedBooking.status === 'in_progress' ? 'In Progress' :
-                     selectedBooking.status === 'completed' ? 'Completed' :
-                     selectedBooking.status === 'cancelled' ? 'Cancelled' :
-                     selectedBooking.status}
+                      selectedBooking.status === 'in_progress' ? 'In Progress' :
+                        selectedBooking.status === 'completed' ? 'Completed' :
+                          selectedBooking.status === 'cancelled' ? 'Cancelled' :
+                            selectedBooking.status}
                   </div>
                 </div>
 
@@ -3663,7 +3673,7 @@ const ProviderDashboard = () => {
                     <Cloud className="w-5 h-5 mr-2 text-blue-600" />
                     Weather Forecast
                   </h3>
-                  
+
                   {weatherLoading && (
                     <div className="flex items-center justify-center py-8">
                       <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
@@ -3687,7 +3697,7 @@ const ProviderDashboard = () => {
                       {weatherData.forecast ? (
                         <div className={`rounded-lg p-4 ${weatherData.forecast.isExactDate ? 'bg-green-50' : 'bg-yellow-50'}`}>
                           <h4 className="font-semibold text-gray-900 mb-3">
-                            {weatherData.forecast.isExactDate 
+                            {weatherData.forecast.isExactDate
                               ? (weatherData.forecast.date ? `Forecast for ${weatherData.forecast.date}` : 'Event Day Forecast')
                               : (weatherData.forecast.date ? `Closest Available Forecast for ${weatherData.forecast.date}` : 'Closest Available Forecast')
                             }
@@ -3700,7 +3710,7 @@ const ProviderDashboard = () => {
                           )}
                           <div className="flex items-center justify-between">
                             <div className="flex items-center">
-                              <img 
+                              <img
                                 src={`https://openweathermap.org/img/wn/${weatherData.forecast.icon}@2x.png`}
                                 alt={weatherData.forecast.description}
                                 className="w-16 h-16"
@@ -3735,7 +3745,7 @@ const ProviderDashboard = () => {
                               const eventDate = new Date(selectedBooking.eventDate);
                               const now = new Date();
                               const daysDiff = Math.ceil((eventDate.getTime() - now.getTime()) / (24 * 60 * 60 * 1000));
-                              
+
                               if (daysDiff < 0) {
                                 return `The event date ${eventDate.toLocaleDateString()} has already passed. Showing current conditions instead.`;
                               } else if (daysDiff > 5) {
@@ -3755,7 +3765,7 @@ const ProviderDashboard = () => {
                         <h4 className="font-semibold text-gray-900 mb-3">Current Conditions</h4>
                         <div className="flex items-center justify-between">
                           <div className="flex items-center">
-                            <img 
+                            <img
                               src={`https://openweathermap.org/img/wn/${weatherData.current.icon}@2x.png`}
                               alt={weatherData.current.description}
                               className="w-12 h-12"

@@ -1304,6 +1304,42 @@ const CustomerDashboard = () => {
           </PremiumCard>
         </Link>
 
+        {/* ID Card Generator Card */}
+        <Link href="/features/id-card">
+          <PremiumCard className="p-6 cursor-pointer hover:shadow-lg transition-all duration-300 group h-full">
+            <div className="flex flex-col h-full">
+              <div className="flex items-center space-x-4 mb-4">
+                <div className="flex-shrink-0">
+                  <div className="w-12 h-12 bg-gradient-to-r from-indigo-500 to-sky-500 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform duration-300">
+                    <Camera className="w-6 h-6 text-white" />
+                  </div>
+                </div>
+                <div className="flex-1">
+                  <h3 className="text-lg font-bold text-slate-900 mb-1">ID Card Generator</h3>
+                  <p className="text-slate-600 text-sm">
+                    Quickly create professional ID cards for event attendees. Upload a photo or use a URL, add a name and event, then download.
+                  </p>
+                </div>
+                <div className="flex-shrink-0">
+                  <ArrowRight className="w-5 h-5 text-slate-400 group-hover:text-indigo-600 transition-colors" />
+                </div>
+              </div>
+              <div className="flex-1 flex items-end">
+                <div className="flex items-center space-x-4 text-xs text-slate-500 w-full">
+                  <div className="flex items-center space-x-1">
+                    <CheckCircle className="w-3 h-3" />
+                    <span>PNG Export</span>
+                  </div>
+                  <div className="flex items-center space-x-1">
+                    <CheckCircle className="w-3 h-3" />
+                    <span>Simple Design</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </PremiumCard>
+        </Link>
+
         {/* Placeholder for future features */}
         <PremiumCard className="p-6 h-full">
           <div className="flex flex-col h-full">
