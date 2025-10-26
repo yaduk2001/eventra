@@ -7,6 +7,12 @@ const socketIo = require('socket.io');
 const rateLimit = require('express-rate-limit');
 require('dotenv').config();
 
+// Set OpenWeatherMap API key if not already set
+if (!process.env.OPENWEATHERMAP_API_KEY) {
+  process.env.OPENWEATHERMAP_API_KEY = '0eda69c968cd2fd1def2e50a202cc3fe';
+  console.log('Set OpenWeatherMap API key from code');
+}
+
 // Initialize Firebase
 const { firebaseApp, database, auth, firebaseHelpers } = require('./config/firebase');
 
@@ -66,6 +72,7 @@ const serviceRoutes = require('./routes/services');
 const freelancerRoutes = require('./routes/freelancer');
 const providerFreelancerRoutes = require('./routes/provider-freelancer');
 const staffJobsRoutes = require('./routes/staff-jobs');
+const weatherRoutes = require('./routes/weather');
 // const searchRoutes = require('./routes/search'); // MySQL routes - disabled
 
 // Firebase helpers already imported above
@@ -111,6 +118,7 @@ app.use('/api/services', serviceRoutes);
 app.use('/api/freelancer', freelancerRoutes);
 app.use('/api/provider-freelancer', providerFreelancerRoutes);
 app.use('/api/staff-jobs', staffJobsRoutes);
+app.use('/api', weatherRoutes);
 // app.use('/api/search', searchRoutes); // MySQL routes - disabled
 
 // Firebase-powered API endpoints
