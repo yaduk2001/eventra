@@ -2,17 +2,17 @@
 
 import { motion } from 'framer-motion';
 import { useState } from 'react';
-import { 
-  Plus, 
-  Edit, 
-  Trash2, 
-  Save, 
-  X, 
-  DollarSign, 
-  Clock, 
-  Users, 
-  Star, 
-  Eye, 
+import {
+  Plus,
+  Edit,
+  Trash2,
+  Save,
+  X,
+  DollarSign,
+  Clock,
+  Users,
+  Star,
+  Eye,
   EyeOff,
   ArrowLeft,
   Sparkles,
@@ -117,14 +117,14 @@ const ManageServicesPage = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
+
     if (!user) {
       toast.error('Please log in to manage services');
       return;
     }
 
     setIsLoading(true);
-    
+
     try {
       const serviceData = {
         ...formData,
@@ -136,8 +136,8 @@ const ManageServicesPage = () => {
       if (editingService) {
         // Update existing service
         await api.updateService(editingService.id, serviceData);
-        setServices(services.map(service => 
-          service.id === editingService.id 
+        setServices(services.map(service =>
+          service.id === editingService.id
             ? { ...serviceData, id: editingService.id, bookings: editingService.bookings, isActive: editingService.isActive }
             : service
         ));
@@ -156,7 +156,7 @@ const ManageServicesPage = () => {
         setShowAddForm(false);
         toast.success('Service added successfully!');
       }
-      
+
       setFormData({
         name: '',
         description: '',
@@ -166,7 +166,7 @@ const ManageServicesPage = () => {
         features: [''],
         images: []
       });
-      
+
     } catch (error) {
       console.error('Error saving service:', error);
       toast.error('Failed to save service. Please try again.');
@@ -203,8 +203,8 @@ const ManageServicesPage = () => {
   };
 
   const toggleServiceStatus = (serviceId) => {
-    setServices(services.map(service => 
-      service.id === serviceId 
+    setServices(services.map(service =>
+      service.id === serviceId
         ? { ...service, isActive: !service.isActive }
         : service
     ));
@@ -232,7 +232,7 @@ const ManageServicesPage = () => {
             <ArrowLeft className="w-5 h-5 mr-2" />
             Back to Dashboard
           </Link>
-          
+
           <div className="flex items-center justify-between">
             <div>
               <h1 className="text-4xl font-bold text-gray-900 mb-2">Manage Your Services</h1>
@@ -282,11 +282,10 @@ const ManageServicesPage = () => {
                   <div className="absolute top-4 right-4 flex space-x-2">
                     <button
                       onClick={() => toggleServiceStatus(service.id)}
-                      className={`px-3 py-1 rounded-full text-xs font-medium ${
-                        service.isActive 
-                          ? 'bg-green-100 text-green-700' 
-                          : 'bg-gray-100 text-gray-700'
-                      }`}
+                      className={`px-3 py-1 rounded-full text-xs font-medium ${service.isActive
+                        ? 'bg-green-100 text-green-700'
+                        : 'bg-gray-100 text-gray-700'
+                        }`}
                     >
                       {service.isActive ? 'Active' : 'Inactive'}
                     </button>
