@@ -62,7 +62,7 @@ class ApiClient {
   // GET request
   async get(endpoint, options = {}) {
     let url = endpoint;
-    
+
     // Handle query parameters
     if (options.params) {
       const searchParams = new URLSearchParams();
@@ -76,10 +76,10 @@ class ApiClient {
         url += (endpoint.includes('?') ? '&' : '?') + queryString;
       }
     }
-    
+
     // Remove params from options since we've handled them
     const { params, ...requestOptions } = options;
-    
+
     return this.request(url, { ...requestOptions, method: 'GET' });
   }
 
@@ -364,14 +364,14 @@ export const api = {
   // Weather functionality
   getWeather: (location, eventDate = null) => {
     let params = {};
-    
+
     if (eventDate) {
       console.log('API - Original event date:', eventDate);
       console.log('API - Original event date type:', typeof eventDate);
-      
+
       // Convert to Date object if it isn't already
       const dateObj = new Date(eventDate);
-      
+
       // Check if the date is valid
       if (isNaN(dateObj.getTime())) {
         console.warn('API - Invalid date provided:', eventDate);
@@ -382,18 +382,18 @@ export const api = {
         params = { eventDate: formattedDate };
       }
     }
-    
+
     console.log('API - getWeather called with:');
     console.log('  Location:', location);
     console.log('  Original Event Date:', eventDate);
     console.log('  Formatted Params:', params);
-    
+
     // Build the URL manually to see what's being sent
     const baseUrl = `/weather/${encodeURIComponent(location)}`;
     const queryString = params.eventDate ? `?eventDate=${encodeURIComponent(params.eventDate)}` : '';
     const fullUrl = `${baseUrl}${queryString}`;
     console.log('  Full URL:', fullUrl);
-    
+
     return apiClient.get(`/weather/${encodeURIComponent(location)}`, { params });
   }
 };

@@ -27,11 +27,11 @@ const httpsRequest = (url) => {
 
     const req = https.request(options, (res) => {
       let data = '';
-      
+
       res.on('data', (chunk) => {
         data += chunk;
       });
-      
+
       res.on('end', () => {
         if (res.statusCode >= 200 && res.statusCode < 300) {
           try {
@@ -76,15 +76,15 @@ const geocodeLocation = async (location) => {
   }
 
   const geocodeUrl = `https://api.openweathermap.org/geo/1.0/direct?q=${encodeURIComponent(cleanLocation)}&limit=1&appid=${apiKey}`;
-  
+
   try {
     const response = await httpsRequest(geocodeUrl);
     if (!response.ok) {
       throw new Error(`Geocoding failed: ${response.status}`);
     }
-    
+
     const data = await response.json();
-    
+
     if (!data || data.length === 0) {
       const parts = location.split(',').map(part => part.trim());
       if (parts.length > 1) {
@@ -92,7 +92,7 @@ const geocodeLocation = async (location) => {
         const fallbackUrl = `https://api.openweathermap.org/geo/1.0/direct?q=${encodeURIComponent(fallbackLocation)}&limit=1&appid=${apiKey}`;
         const fallbackResponse = await httpsRequest(fallbackUrl);
         const fallbackData = await fallbackResponse.json();
-        
+
         if (fallbackData && fallbackData.length > 0) {
           return {
             name: fallbackData[0].name,
@@ -105,7 +105,7 @@ const geocodeLocation = async (location) => {
       }
       throw new Error('Location not found');
     }
-    
+
     return {
       name: data[0].name,
       lat: data[0].lat,
@@ -121,26 +121,26 @@ const geocodeLocation = async (location) => {
 
 const getWeatherData = async (lat, lon, eventDate = null) => {
   const apiKey = process.env.OPENWEATHERMAP_API_KEY;
-  
+
   try {
     const currentWeatherUrl = `https://api.openweathermap.org/data/2.5/weather?lat=${lat}&lon=${lon}&appid=${apiKey}&units=metric`;
     const currentResponse = await httpsRequest(currentWeatherUrl);
-    
+
     if (!currentResponse.ok) {
       throw new Error(`Current weather API failed: ${currentResponse.status}`);
     }
-    
+
     const currentData = await currentResponse.json();
-    
+
     const forecastUrl = `https://api.openweathermap.org/data/2.5/forecast?lat=${lat}&lon=${lon}&appid=${apiKey}&units=metric`;
     const forecastResponse = await httpsRequest(forecastUrl);
-    
+
     if (!forecastResponse.ok) {
       throw new Error(`Forecast API failed: ${forecastResponse.status}`);
     }
-    
+
     const forecastData = await forecastResponse.json();
-    
+
     console.log('Backend - Forecast API response received');
     console.log('Backend - Number of forecast items:', forecastData.list ? forecastData.list.length : 0);
     if (forecastData.list && forecastData.list.length > 0) {
@@ -148,7 +148,7 @@ const getWeatherData = async (lat, lon, eventDate = null) => {
       const lastDate = new Date(forecastData.list[forecastData.list.length - 1].dt * 1000).toISOString().split('T')[0];
       console.log('Backend - Forecast date range:', firstDate, 'to', lastDate);
       console.log('Backend - First forecast UTC:', new Date(forecastData.list[0].dt * 1000).toUTCString());
-      
+
       // Log all available forecast dates for debugging
       console.log('Backend - All available forecast dates:');
       const now = new Date(); // Define now here for the forEach loop
@@ -162,7 +162,7 @@ const getWeatherData = async (lat, lon, eventDate = null) => {
     } else {
       console.log('Backend - No forecast data received from API');
     }
-    
+
     let eventForecast = null;
     if (eventDate) {
       let targetDate;
@@ -207,16 +207,16 @@ const getWeatherData = async (lat, lon, eventDate = null) => {
         ));
         console.log('Backend - Parsed non-string format:', eventDate, '->', targetDate);
       }
-      
+
       const targetDateStr = targetDate.toISOString().split('T')[0];
-      
+
       console.log('Backend - Received event date:', eventDate);
       console.log('Backend - Parsed target date:', targetDateStr);
       console.log('Backend - Target date object:', targetDate);
       console.log('Backend - Target date timezone offset:', targetDate.getTimezoneOffset());
       console.log('Backend - Target date UTC:', targetDate.toUTCString());
       console.log('Backend - Looking for forecast for date:', targetDateStr);
-      
+
       console.log('Backend - Available forecast dates:');
       const uniqueDates = new Set();
       forecastData.list.forEach((item, index) => {
@@ -228,14 +228,14 @@ const getWeatherData = async (lat, lon, eventDate = null) => {
         console.log(`  ${index}: ${itemDateStr} (${itemDate.toLocaleDateString()}) - ${daysDiff} days away`);
       });
       console.log('Backend - Unique forecast dates available:', Array.from(uniqueDates).sort());
-      
+
       // Log the target date for debugging
       const daysFromNow = Math.ceil((targetDate.getTime() - now.getTime()) / (24 * 60 * 60 * 1000));
       console.log('Backend - Current server time:', now.toISOString());
       console.log('Backend - Current server date:', now.toISOString().split('T')[0]);
       console.log('Backend - Target date is', daysFromNow, 'days from now');
       console.log('Backend - Attempting to find forecast for:', targetDateStr);
-      
+
       // Find forecasts for the target date using a more robust approach
       console.log('Backend - Looking for forecasts near target date:', targetDateStr);
       const forecastsOnTargetDate = forecastData.list.filter(item => {
@@ -246,7 +246,7 @@ const getWeatherData = async (lat, lon, eventDate = null) => {
         return matches;
       });
       console.log('Backend - Found', forecastsOnTargetDate.length, 'exact matches for', targetDateStr);
-      
+
       // If no exact match, let's see what dates are actually available
       if (forecastsOnTargetDate.length === 0) {
         console.log('Backend - No exact match found. Available dates are:');
@@ -258,7 +258,7 @@ const getWeatherData = async (lat, lon, eventDate = null) => {
         console.log('Backend - Looking for:', targetDateStr);
         console.log('Backend - Is target date in available dates?', availableDates.includes(targetDateStr));
       }
-      
+
       if (forecastsOnTargetDate.length > 0) {
         // Find the forecast closest to noon (12:00) on the target date
         const targetDateOnly = new Date(targetDateStr);
@@ -273,10 +273,10 @@ const getWeatherData = async (lat, lon, eventDate = null) => {
         console.log('Found forecast for target date:', targetDateStr, 'at time:', new Date(eventForecast.dt * 1000).toISOString());
       } else {
         console.log('No forecasts found for target date:', targetDateStr);
-        
+
         // Try to find the closest available forecast
         const targetTime = targetDate.getTime();
-        
+
         const closestForecast = forecastData.list
           .map(item => {
             const itemDate = new Date(item.dt * 1000);
@@ -288,13 +288,13 @@ const getWeatherData = async (lat, lon, eventDate = null) => {
             };
           })
           .sort((a, b) => a.timeDiff - b.timeDiff);
-        
+
         console.log('Backend - Closest forecasts (sorted by time difference):');
         closestForecast.slice(0, 5).forEach((item, index) => {
           const daysDiff = Math.round(item.timeDiff / (24 * 60 * 60 * 1000));
           console.log(`  ${index}: ${item.dateStr} - ${daysDiff} days away`);
         });
-        
+
         if (closestForecast.length > 0) {
           eventForecast = closestForecast[0];
           const closestDate = new Date(eventForecast.dt * 1000).toISOString().split('T')[0];
@@ -304,7 +304,7 @@ const getWeatherData = async (lat, lon, eventDate = null) => {
           console.log('No forecast data available at all');
         }
       }
-      
+
     }
 
     // Check if the forecast is for the exact event date or a different date
@@ -353,9 +353,9 @@ const getWeatherData = async (lat, lon, eventDate = null) => {
         icon: eventForecast.weather[0].icon,
         humidity: eventForecast.main.humidity,
         windSpeed: Math.round(eventForecast.wind.speed * 3.6),
-        time: new Date(eventForecast.dt * 1000).toLocaleTimeString('en-US', { 
-          hour: '2-digit', 
-          minute: '2-digit' 
+        time: new Date(eventForecast.dt * 1000).toLocaleTimeString('en-US', {
+          hour: '2-digit',
+          minute: '2-digit'
         }),
         date: new Date(eventForecast.dt * 1000).toLocaleDateString('en-US', {
           weekday: 'long',
@@ -382,7 +382,7 @@ router.get('/weather/:location', verifyToken, async (req, res) => {
     // TEMPORARY: Clear cache for debugging
     weatherCache.clear();
     console.log('Cache cleared for debugging');
-    
+
     console.log('RAW REQUEST:', {
       method: req.method,
       url: req.url,
@@ -392,10 +392,10 @@ router.get('/weather/:location', verifyToken, async (req, res) => {
       queryKeys: Object.keys(req.query),
       queryValues: Object.values(req.query)
     });
-    
+
     const { location } = req.params;
     const { eventDate } = req.query;
-    
+
     console.log('Weather API called with:');
     console.log('  Location:', location);
     console.log('  Event Date:', eventDate);
@@ -408,7 +408,7 @@ router.get('/weather/:location', verifyToken, async (req, res) => {
     console.log('  Request URL:', req.url);
     console.log('  Current Date:', new Date().toISOString().split('T')[0]);
     console.log('  Days from now:', eventDate ? Math.ceil((new Date(eventDate) - new Date()) / (24 * 60 * 60 * 1000)) : 'N/A');
-    
+
     if (!location) {
       return res.status(400).json({
         error: 'Location required',
@@ -422,7 +422,7 @@ router.get('/weather/:location', verifyToken, async (req, res) => {
     console.log('API Key length:', apiKey ? apiKey.length : 0);
     console.log('API Key value:', apiKey ? apiKey.substring(0, 8) + '...' : 'Not set');
     console.log('All env vars:', Object.keys(process.env).filter(key => key.includes('WEATHER')));
-    
+
     if (!apiKey) {
       console.error('OpenWeatherMap API key not configured');
       return res.status(500).json({
@@ -430,15 +430,15 @@ router.get('/weather/:location', verifyToken, async (req, res) => {
         message: 'OpenWeatherMap API key not configured'
       });
     }
-    
+
     // Check cache first
     const cacheKey = `${location}:${eventDate || 'current'}`;
     const cachedData = weatherCache.get(cacheKey);
-    
+
     console.log('Cache key:', cacheKey);
     console.log('Cache exists:', !!cachedData);
     console.log('Cache valid:', cachedData ? isCacheValid(cachedData.timestamp) : false);
-    
+
     if (cachedData && isCacheValid(cachedData.timestamp)) {
       console.log('Returning cached weather data for:', location, 'with eventDate:', eventDate);
       return res.json({
@@ -447,20 +447,20 @@ router.get('/weather/:location', verifyToken, async (req, res) => {
         cached: true
       });
     }
-    
+
     console.log('Fetching fresh weather data for:', location);
-    
+
     try {
       // Geocode location
       const geocodedLocation = await geocodeLocation(location);
-      
+
       // Get weather data
       const weatherData = await getWeatherData(
-        geocodedLocation.lat, 
-        geocodedLocation.lon, 
+        geocodedLocation.lat,
+        geocodedLocation.lon,
         eventDate
       );
-      
+
       // Add location info to response
       const responseData = {
         ...weatherData,
@@ -470,13 +470,13 @@ router.get('/weather/:location', verifyToken, async (req, res) => {
           geocoded: geocodedLocation
         }
       };
-      
+
       // Cache the result
       weatherCache.set(cacheKey, {
         data: responseData,
         timestamp: Date.now()
       });
-      
+
       // Clean old cache entries (simple cleanup)
       if (weatherCache.size > 100) {
         const now = Date.now();
@@ -486,7 +486,7 @@ router.get('/weather/:location', verifyToken, async (req, res) => {
           }
         }
       }
-      
+
       res.json({
         success: true,
         data: responseData,
@@ -494,7 +494,7 @@ router.get('/weather/:location', verifyToken, async (req, res) => {
       });
     } catch (weatherError) {
       console.error('Weather fetch error:', weatherError);
-      
+
       // Return a fallback response instead of failing completely
       const fallbackData = {
         current: {
@@ -529,7 +529,7 @@ router.get('/weather/:location', verifyToken, async (req, res) => {
           original: location
         }
       };
-      
+
       res.json({
         success: true,
         data: fallbackData,
@@ -538,7 +538,7 @@ router.get('/weather/:location', verifyToken, async (req, res) => {
         message: 'Using fallback weather data due to API issues'
       });
     }
-    
+
   } catch (error) {
     console.error('Weather API error:', error);
     res.status(500).json({
@@ -564,11 +564,11 @@ router.get('/weather-debug/:location/:date', async (req, res) => {
   try {
     const { location, date } = req.params;
     console.log('Debug endpoint called with:', { location, date });
-    
+
     // Get weather data
     const geocodedLocation = await geocodeLocation(location);
     const weatherData = await getWeatherData(geocodedLocation.lat, geocodedLocation.lon, date);
-    
+
     res.json({
       success: true,
       location: location,
@@ -595,17 +595,17 @@ router.get('/weather-test-dates/:location', async (req, res) => {
   try {
     const { location } = req.params;
     console.log('Testing available dates for:', location);
-    
+
     // Get geocoded location
     const geocodedLocation = await geocodeLocation(location);
-    
+
     // Get raw forecast data
     const apiKey = process.env.OPENWEATHERMAP_API_KEY;
     const forecastUrl = `https://api.openweathermap.org/data/2.5/forecast?lat=${geocodedLocation.lat}&lon=${geocodedLocation.lon}&appid=${apiKey}&units=metric`;
-    
+
     const https = require('https');
     const { URL } = require('url');
-    
+
     const response = await new Promise((resolve, reject) => {
       const urlObj = new URL(forecastUrl);
       const options = {
@@ -639,15 +639,15 @@ router.get('/weather-test-dates/:location', async (req, res) => {
       req.setTimeout(10000, () => { req.destroy(); reject(new Error('Request timeout')); });
       req.end();
     });
-    
+
     const forecastData = await response.json();
-    
+
     // Extract all available dates
     const availableDates = [...new Set(forecastData.list.map(item => {
       const itemDate = new Date(item.dt * 1000);
       return itemDate.toISOString().split('T')[0];
     }))].sort();
-    
+
     res.json({
       success: true,
       location: location,
