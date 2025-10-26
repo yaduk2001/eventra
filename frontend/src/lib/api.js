@@ -395,6 +395,50 @@ export const api = {
     console.log('  Full URL:', fullUrl);
 
     return apiClient.get(`/weather/${encodeURIComponent(location)}`, { params });
+  },
+
+  // Email functionality
+  email: {
+    sendBulkEmail: async (formData) => {
+      const url = `${apiClient.baseURL}/email/send-bulk`;
+
+      // Get auth token
+      let authHeader = {};
+      if (auth.currentUser) {
+        try {
+          const token = await auth.currentUser.getIdToken();
+          authHeader = { Authorization: `Bearer ${token}` };
+        } catch (error) {
+          console.error('Error getting auth token:', error);
+        }
+      }
+
+      try {
+        const response = await fetch(url, {
+          method: 'POST',
+          headers: {
+            ...authHeader
+          },
+          body: formData
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}));
+          throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
+        }
+
+        const data = await response.json();
+        return data;
+      } catch (error) {
+        console.error('API request failed:', error);
+        throw error;
+      }
+    },
+    getEmailHistory: async (limit = 50) => {
+      const res = await apiClient.get('/email/history', { params: { limit } });
+      return res?.data || res;
+    },
+    getEmailJobStatus: (jobId) => apiClient.get(`/email/status/${jobId}`)
   }
 };
 
