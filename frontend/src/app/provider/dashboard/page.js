@@ -41,7 +41,8 @@ import {
   Briefcase,
   RefreshCw,
   Award,
-  ArrowRight
+  ArrowRight,
+  Cloud
 } from 'lucide-react';
 import PremiumButton from '../../../components/ui/PremiumButton';
 import PremiumCard from '../../../components/ui/PremiumCard';
@@ -126,6 +127,14 @@ const ProviderDashboard = () => {
   const [freelancerJobApplications, setFreelancerJobApplications] = useState([]);
   const [showFreelancerApplicationsModal, setShowFreelancerApplicationsModal] = useState(false);
   const [isCalculatingEndDate, setIsCalculatingEndDate] = useState(false);
+  
+  // Booking details modal state
+  const [showBookingDetailsModal, setShowBookingDetailsModal] = useState(false);
+  
+  // Weather state (now integrated into booking details)
+  const [weatherData, setWeatherData] = useState(null);
+  const [weatherLoading, setWeatherLoading] = useState(false);
+  const [weatherError, setWeatherError] = useState(null);
 
   // Chat state
   const [chatRooms, setChatRooms] = useState([]);
@@ -326,6 +335,57 @@ const ProviderDashboard = () => {
     } finally {
       setIsDeletingJob(false);
     }
+  };
+
+  // Booking details functions
+  const handleViewBookingDetails = async (booking) => {
+    setSelectedBooking(booking);
+    setShowBookingDetailsModal(true);
+    
+    // Fetch weather data for the booking
+    setWeatherLoading(true);
+    setWeatherError(null);
+    setWeatherData(null);
+
+    try {
+      // Format event date to YYYY-MM-DD format to avoid timezone issues
+      let formattedEventDate = null;
+      if (booking.eventDate) {
+        console.log('Frontend - Original event date:', booking.eventDate);
+        console.log('Frontend - Event date type:', typeof booking.eventDate);
+        
+        const eventDate = new Date(booking.eventDate);
+        // Set to noon to avoid timezone edge cases
+        eventDate.setHours(12, 0, 0, 0);
+        formattedEventDate = eventDate.toISOString().split('T')[0];
+        
+        // Check if event date is in the future and within forecast range
+        const now = new Date();
+        const daysDiff = Math.ceil((eventDate.getTime() - now.getTime()) / (24 * 60 * 60 * 1000));
+        console.log('Frontend - Event date is', daysDiff, 'days from now');
+        console.log('Frontend - Current date:', now.toISOString().split('T')[0]);
+        console.log('Frontend - Event date:', eventDate.toISOString().split('T')[0]);
+        
+        console.log('Frontend - Formatted event date:', formattedEventDate);
+        console.log('Frontend - Event date object:', eventDate);
+        console.log('Frontend - Event date ISO string:', eventDate.toISOString());
+      }
+
+      const response = await api.getWeather(booking.location, formattedEventDate);
+      setWeatherData(response.data);
+    } catch (error) {
+      console.error('Error fetching weather:', error);
+      setWeatherError(error.message || 'Failed to fetch weather data');
+    } finally {
+      setWeatherLoading(false);
+    }
+  };
+
+  const handleCloseBookingDetailsModal = () => {
+    setShowBookingDetailsModal(false);
+    setSelectedBooking(null);
+    setWeatherData(null);
+    setWeatherError(null);
   };
 
   // Freelancer job functions
@@ -2246,49 +2306,47 @@ const ProviderDashboard = () => {
                       </div>
                     </div>
 
-                    <h4 className="text-lg font-semibold text-gray-900 mb-2">
-                      {booking.eventType} Event
-                    </h4>
-
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm text-gray-600 mb-3">
+                    <div className="flex items-center gap-4 mb-4">
+                      <h4 className="text-lg font-semibold text-gray-900 flex-1">
+                        {(() => {
+                          // Try to extract event name from requirements field
+                          if (booking.requirements) {
+                            const eventNameMatch = booking.requirements.match(/Event Name:\s*(.+?)(?:\s*,\s*Event Type:|$)/i);
+                            if (eventNameMatch) {
+                              return eventNameMatch[1].trim();
+                            }
+                          }
+                          // Fallback to other fields
+                          return booking.eventName || booking.serviceName || booking.title || 'Event';
+                        })()}
+                      </h4>
                       <div className="flex items-center gap-2">
-                        <Calendar className="w-4 h-4" />
-                        <span>{new Date(booking.eventDate).toLocaleDateString()}</span>
+                        <Calendar className="w-4 h-4 text-blue-600" />
+                        <p className="text-sm text-gray-600">{booking.eventType}</p>
                       </div>
                       <div className="flex items-center gap-2">
-                        <MapPin className="w-4 h-4" />
-                        <span>{booking.location}</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <DollarSign className="w-4 h-4" />
-                        <span>₹{booking.price}</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Users className="w-4 h-4" />
-                        <span>{booking.guestCount || 'N/A'} guests</span>
+                        <MapPin className="w-4 h-4 text-red-600" />
+                        <p className="text-sm text-gray-600">{booking.location || 'Location not specified'}</p>
                       </div>
                     </div>
-
-                    {booking.requirements && (
-                      <p className="text-gray-600 text-sm mb-3">
-                        <strong>Requirements:</strong> {booking.requirements}
-                      </p>
-                    )}
-
-                    <div className="flex items-center gap-4 text-sm text-gray-500">
-                      <span>Booked {new Date(booking.createdAt).toLocaleDateString()}</span>
+                    
+                    <div className="flex justify-end gap-2">
+                      <PremiumButton 
+                        variant="ghost" 
+                        size="sm"
+                        onClick={() => handleViewBookingDetails(booking)}
+                      >
+                        <Eye className="w-4 h-4 mr-1" />
+                        View Details
+                      </PremiumButton>
+                      <button
+                        className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-lg hover:from-purple-600 hover:to-pink-600 transition-all duration-200 font-medium text-sm"
+                        onClick={() => handleAIStaffRecommendation(booking.id)}
+                      >
+                        <Sparkles className="w-4 h-4" />
+                        AI Staff Recommendation
+                      </button>
                     </div>
-                  </div>
-
-                  {/* Action Buttons */}
-                  <div className="flex flex-col gap-2 mt-4">
-                    <button
-                      className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-lg hover:from-purple-600 hover:to-pink-600 transition-all duration-200 font-medium text-sm"
-                      onClick={() => handleAIStaffRecommendation(booking.id)}
-                    >
-                      <Sparkles className="w-4 h-4" />
-                      AI Staff Recommendation
-                    </button>
                   </div>
                 </div>
               </PremiumCard>
@@ -3465,6 +3523,285 @@ const ProviderDashboard = () => {
         onApprove={handleApproveRecommendations}
         isLoading={aiLoading}
       />
+
+      {/* Booking Details Modal */}
+      {showBookingDetailsModal && selectedBooking && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.95 }}
+            className="bg-white rounded-xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto"
+          >
+            <div className="p-6">
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="text-2xl font-bold text-gray-900">Booking Details</h2>
+                <button
+                  onClick={handleCloseBookingDetailsModal}
+                  className="text-gray-400 hover:text-gray-600 transition-colors"
+                >
+                  <X className="w-6 h-6" />
+                </button>
+              </div>
+
+              <div className="space-y-6">
+                {/* Status Badge */}
+                <div className="flex items-center gap-3">
+                  <div className={`px-3 py-1 rounded-full text-sm font-medium ${
+                    selectedBooking.status === 'confirmed' ? 'bg-green-100 text-green-700' :
+                    selectedBooking.status === 'in_progress' ? 'bg-blue-100 text-blue-700' :
+                    selectedBooking.status === 'completed' ? 'bg-purple-100 text-purple-700' :
+                    selectedBooking.status === 'cancelled' ? 'bg-red-100 text-red-700' :
+                    'bg-gray-100 text-gray-700'
+                  }`}>
+                    {selectedBooking.status === 'confirmed' ? 'Confirmed' :
+                     selectedBooking.status === 'in_progress' ? 'In Progress' :
+                     selectedBooking.status === 'completed' ? 'Completed' :
+                     selectedBooking.status === 'cancelled' ? 'Cancelled' :
+                     selectedBooking.status}
+                  </div>
+                </div>
+
+                {/* Event Information */}
+                <div className="bg-gray-50 rounded-lg p-4">
+                  <h3 className="text-lg font-semibold text-gray-900 mb-4">Event Information</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="text-sm font-medium text-gray-600">Event Title</label>
+                      <p className="text-gray-900">{(() => {
+                        // Try to extract event name from requirements field
+                        if (selectedBooking.requirements) {
+                          const eventNameMatch = selectedBooking.requirements.match(/Event Name:\s*(.+?)(?:\s*,\s*Event Type:|$)/i);
+                          if (eventNameMatch) {
+                            return eventNameMatch[1].trim();
+                          }
+                        }
+                        // Fallback to other fields
+                        return selectedBooking.eventName || selectedBooking.serviceName || selectedBooking.title || selectedBooking.eventType + ' Event';
+                      })()}</p>
+                    </div>
+                    <div>
+                      <label className="text-sm font-medium text-gray-600">Event Type</label>
+                      <p className="text-gray-900">{selectedBooking.eventType}</p>
+                    </div>
+                    <div>
+                      <label className="text-sm font-medium text-gray-600">Event Date</label>
+                      <p className="text-gray-900">{new Date(selectedBooking.eventDate).toLocaleDateString()}</p>
+                    </div>
+                    {selectedBooking.eventTime && (
+                      <div>
+                        <label className="text-sm font-medium text-gray-600">Event Time</label>
+                        <p className="text-gray-900">{selectedBooking.eventTime}</p>
+                      </div>
+                    )}
+                    <div>
+                      <label className="text-sm font-medium text-gray-600">Location</label>
+                      <p className="text-gray-900">{selectedBooking.location}</p>
+                    </div>
+                    <div>
+                      <label className="text-sm font-medium text-gray-600">Number of Guests</label>
+                      <p className="text-gray-900">{selectedBooking.guestCount || 'N/A'} guests</p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Financial Information */}
+                <div className="bg-gray-50 rounded-lg p-4">
+                  <h3 className="text-lg font-semibold text-gray-900 mb-4">Financial Details</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="text-sm font-medium text-gray-600">Total Price</label>
+                      <p className="text-gray-900 text-lg font-semibold">₹{selectedBooking.price}</p>
+                    </div>
+                    {selectedBooking.budget && selectedBooking.budget !== selectedBooking.price && (
+                      <div>
+                        <label className="text-sm font-medium text-gray-600">Original Budget</label>
+                        <p className="text-gray-900">₹{selectedBooking.budget}</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Requirements */}
+                {selectedBooking.requirements && (
+                  <div className="bg-gray-50 rounded-lg p-4">
+                    <h3 className="text-lg font-semibold text-gray-900 mb-4">Requirements</h3>
+                    <p className="text-gray-700">{selectedBooking.requirements}</p>
+                  </div>
+                )}
+
+                {/* Booking Information */}
+                <div className="bg-gray-50 rounded-lg p-4">
+                  <h3 className="text-lg font-semibold text-gray-900 mb-4">Booking Information</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="text-sm font-medium text-gray-600">Booked On</label>
+                      <p className="text-gray-900">{new Date(selectedBooking.createdAt).toLocaleDateString()}</p>
+                    </div>
+                    <div>
+                      <label className="text-sm font-medium text-gray-600">Last Updated</label>
+                      <p className="text-gray-900">{new Date(selectedBooking.updatedAt).toLocaleDateString()}</p>
+                    </div>
+                    {selectedBooking.customerName && (
+                      <div>
+                        <label className="text-sm font-medium text-gray-600">Customer</label>
+                        <p className="text-gray-900">{selectedBooking.customerName}</p>
+                      </div>
+                    )}
+                    {selectedBooking.serviceName && (
+                      <div>
+                        <label className="text-sm font-medium text-gray-600">Service</label>
+                        <p className="text-gray-900">{selectedBooking.serviceName}</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Weather Forecast Section */}
+                <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg p-4">
+                  <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
+                    <Cloud className="w-5 h-5 mr-2 text-blue-600" />
+                    Weather Forecast
+                  </h3>
+                  
+                  {weatherLoading && (
+                    <div className="flex items-center justify-center py-8">
+                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                      <span className="ml-2 text-gray-600">Loading weather data...</span>
+                    </div>
+                  )}
+
+                  {weatherError && (
+                    <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                      <div className="flex items-center">
+                        <AlertCircle className="w-5 h-5 text-red-600 mr-2" />
+                        <span className="text-red-800 font-medium">Weather Unavailable</span>
+                      </div>
+                      <p className="text-red-700 text-sm mt-1">{weatherError}</p>
+                    </div>
+                  )}
+
+                  {weatherData && !weatherLoading && (
+                    <div className="space-y-4">
+                      {/* Event Day Forecast - Priority Display */}
+                      {weatherData.forecast ? (
+                        <div className={`rounded-lg p-4 ${weatherData.forecast.isExactDate ? 'bg-green-50' : 'bg-yellow-50'}`}>
+                          <h4 className="font-semibold text-gray-900 mb-3">
+                            {weatherData.forecast.isExactDate 
+                              ? (weatherData.forecast.date ? `Forecast for ${weatherData.forecast.date}` : 'Event Day Forecast')
+                              : (weatherData.forecast.date ? `Closest Available Forecast for ${weatherData.forecast.date}` : 'Closest Available Forecast')
+                            }
+                          </h4>
+                          {!weatherData.forecast.isExactDate && (
+                            <div className="mb-3 p-2 bg-yellow-100 rounded text-yellow-800 text-sm">
+                              <AlertCircle className="w-4 h-4 inline mr-1" />
+                              This is the closest available forecast to your event date.
+                            </div>
+                          )}
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center">
+                              <img 
+                                src={`https://openweathermap.org/img/wn/${weatherData.forecast.icon}@2x.png`}
+                                alt={weatherData.forecast.description}
+                                className="w-16 h-16"
+                              />
+                              <div>
+                                <p className="text-2xl font-bold text-gray-900">
+                                  {weatherData.forecast.temperature}°C
+                                </p>
+                                <p className="text-sm text-gray-600 capitalize">
+                                  {weatherData.forecast.description}
+                                </p>
+                                <p className="text-xs text-gray-500">
+                                  {weatherData.forecast.time}
+                                </p>
+                              </div>
+                            </div>
+                            <div className="text-right text-sm text-gray-600">
+                              <p>Feels like {weatherData.forecast.feelsLike}°C</p>
+                              <p>Humidity: {weatherData.forecast.humidity}%</p>
+                              <p>Wind: {weatherData.forecast.windSpeed} km/h</p>
+                            </div>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="bg-yellow-50 rounded-lg p-4">
+                          <div className="flex items-center">
+                            <AlertCircle className="w-5 h-5 text-yellow-600 mr-2" />
+                            <span className="text-yellow-800 font-medium">Event Day Forecast Not Available</span>
+                          </div>
+                          <p className="text-yellow-700 text-sm mt-1">
+                            {selectedBooking?.eventDate ? (() => {
+                              const eventDate = new Date(selectedBooking.eventDate);
+                              const now = new Date();
+                              const daysDiff = Math.ceil((eventDate.getTime() - now.getTime()) / (24 * 60 * 60 * 1000));
+                              
+                              if (daysDiff < 0) {
+                                return `The event date ${eventDate.toLocaleDateString()} has already passed. Showing current conditions instead.`;
+                              } else if (daysDiff > 5) {
+                                return `Forecast data for ${eventDate.toLocaleDateString()} is not available. Weather forecasts are only available for the next 5 days. Showing the closest available forecast instead.`;
+                              } else {
+                                return `Forecast data for ${eventDate.toLocaleDateString()} is not available. Showing the closest available forecast instead.`;
+                              }
+                            })() :
+                              'Forecast data for the event date is not available. Showing the closest available forecast instead.'
+                            }
+                          </p>
+                        </div>
+                      )}
+
+                      {/* Current Weather - Secondary Display */}
+                      <div className="bg-blue-50 rounded-lg p-4">
+                        <h4 className="font-semibold text-gray-900 mb-3">Current Conditions</h4>
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center">
+                            <img 
+                              src={`https://openweathermap.org/img/wn/${weatherData.current.icon}@2x.png`}
+                              alt={weatherData.current.description}
+                              className="w-12 h-12"
+                            />
+                            <div>
+                              <p className="text-xl font-bold text-gray-900">
+                                {weatherData.current.temperature}°C
+                              </p>
+                              <p className="text-sm text-gray-600 capitalize">
+                                {weatherData.current.description}
+                              </p>
+                            </div>
+                          </div>
+                          <div className="text-right text-sm text-gray-600">
+                            <p>Feels like {weatherData.current.feelsLike}°C</p>
+                            <p>Humidity: {weatherData.current.humidity}%</p>
+                            <p>Wind: {weatherData.current.windSpeed} km/h</p>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Location Info */}
+                      <div className="bg-gray-50 rounded-lg p-3">
+                        <p className="text-xs text-gray-500 text-center">
+                          Weather for {weatherData.location.name}, {weatherData.location.country}
+                        </p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Close Button */}
+              <div className="mt-6 flex justify-end">
+                <PremiumButton
+                  variant="primary"
+                  onClick={handleCloseBookingDetailsModal}
+                >
+                  Close
+                </PremiumButton>
+              </div>
+            </div>
+          </motion.div>
+        </div>
+      )}
+
     </div>
   );
 };
