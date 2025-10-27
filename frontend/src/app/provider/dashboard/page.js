@@ -43,6 +43,7 @@ import {
   Award,
   ArrowRight,
   Camera,
+  Cloud,
 } from 'lucide-react';
 import PremiumButton from '../../../components/ui/PremiumButton';
 import PremiumCard from '../../../components/ui/PremiumCard';
