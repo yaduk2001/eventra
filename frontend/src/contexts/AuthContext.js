@@ -90,6 +90,14 @@ export const AuthProvider = ({ children }) => {
       await signOut(auth);
       setUser(null);
       setUserProfile(null);
+      
+      // Clear localStorage to prevent stale data on next login
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem('userRole');
+        localStorage.removeItem('registrationComplete');
+        console.log('Cleared localStorage on logout');
+      }
+      
       return { success: true };
     } catch (error) {
       console.error('Sign out error:', error);
@@ -120,6 +128,13 @@ export const AuthProvider = ({ children }) => {
       if (response.data) {
         console.log('Setting user profile:', response.data);
         setUserProfile(response.data);
+        
+        // Sync role to localStorage to keep it consistent with backend
+        if (response.data.role && typeof window !== 'undefined') {
+          localStorage.setItem('userRole', response.data.role);
+          console.log('Synced role to localStorage:', response.data.role);
+        }
+        
         return response.data;
       }
     } catch (error) {
@@ -181,14 +196,31 @@ export const AuthProvider = ({ children }) => {
       setUser(user);
       
       if (user) {
-        // Fetch user profile when user signs in
+        // Fetch user profile when user signs in with retry logic
         console.log('Fetching user profile...');
-        try {
-          await fetchUserProfile(user.uid);
-        } catch (error) {
-          console.warn('Profile fetch failed during auth state change:', error);
-          // Don't fail the auth process if profile fetch fails
-        }
+        let retryCount = 0;
+        const maxRetries = 3;
+        
+        const fetchWithRetry = async () => {
+          try {
+            await fetchUserProfile(user.uid);
+          } catch (error) {
+            console.warn(`Profile fetch failed (attempt ${retryCount + 1}/${maxRetries}):`, error);
+            
+            if (retryCount < maxRetries - 1) {
+              retryCount++;
+              // Wait before retrying (exponential backoff)
+              setTimeout(() => {
+                fetchWithRetry();
+              }, 1000 * retryCount);
+            } else {
+              console.warn('Profile fetch failed after all retries, continuing without profile');
+              // Don't fail the auth process if profile fetch fails
+            }
+          }
+        };
+        
+        fetchWithRetry();
       } else {
         setUserProfile(null);
       }

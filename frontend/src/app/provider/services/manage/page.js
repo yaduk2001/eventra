@@ -2,17 +2,17 @@
 
 import { motion } from 'framer-motion';
 import { useState } from 'react';
-import { 
-  Plus, 
-  Edit, 
-  Trash2, 
-  Save, 
-  X, 
-  DollarSign, 
-  Clock, 
-  Users, 
-  Star, 
-  Eye, 
+import {
+  Plus,
+  Edit,
+  Trash2,
+  Save,
+  X,
+  DollarSign,
+  Clock,
+  Users,
+  Star,
+  Eye,
   EyeOff,
   ArrowLeft,
   Sparkles,
@@ -22,6 +22,7 @@ import {
 import Link from 'next/link';
 import PremiumButton from '../../../../components/ui/PremiumButton';
 import PremiumCard from '../../../../components/ui/PremiumCard';
+import IDCardGenerator from '../../../../components/ui/IDCardGenerator';
 import { api } from '../../../../lib/api';
 import { useAuth } from '../../../../contexts/AuthContext';
 import toast from 'react-hot-toast';
@@ -58,6 +59,7 @@ const ManageServicesPage = () => {
 
   const [editingService, setEditingService] = useState(null);
   const [showAddForm, setShowAddForm] = useState(false);
+  const [showIDGenerator, setShowIDGenerator] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
     description: '',
@@ -115,14 +117,14 @@ const ManageServicesPage = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
+
     if (!user) {
       toast.error('Please log in to manage services');
       return;
     }
 
     setIsLoading(true);
-    
+
     try {
       const serviceData = {
         ...formData,
@@ -134,8 +136,8 @@ const ManageServicesPage = () => {
       if (editingService) {
         // Update existing service
         await api.updateService(editingService.id, serviceData);
-        setServices(services.map(service => 
-          service.id === editingService.id 
+        setServices(services.map(service =>
+          service.id === editingService.id
             ? { ...serviceData, id: editingService.id, bookings: editingService.bookings, isActive: editingService.isActive }
             : service
         ));
@@ -154,7 +156,7 @@ const ManageServicesPage = () => {
         setShowAddForm(false);
         toast.success('Service added successfully!');
       }
-      
+
       setFormData({
         name: '',
         description: '',
@@ -164,7 +166,7 @@ const ManageServicesPage = () => {
         features: [''],
         images: []
       });
-      
+
     } catch (error) {
       console.error('Error saving service:', error);
       toast.error('Failed to save service. Please try again.');
@@ -201,8 +203,8 @@ const ManageServicesPage = () => {
   };
 
   const toggleServiceStatus = (serviceId) => {
-    setServices(services.map(service => 
-      service.id === serviceId 
+    setServices(services.map(service =>
+      service.id === serviceId
         ? { ...service, isActive: !service.isActive }
         : service
     ));
@@ -230,7 +232,7 @@ const ManageServicesPage = () => {
             <ArrowLeft className="w-5 h-5 mr-2" />
             Back to Dashboard
           </Link>
-          
+
           <div className="flex items-center justify-between">
             <div>
               <h1 className="text-4xl font-bold text-gray-900 mb-2">Manage Your Services</h1>
@@ -280,11 +282,10 @@ const ManageServicesPage = () => {
                   <div className="absolute top-4 right-4 flex space-x-2">
                     <button
                       onClick={() => toggleServiceStatus(service.id)}
-                      className={`px-3 py-1 rounded-full text-xs font-medium ${
-                        service.isActive 
-                          ? 'bg-green-100 text-green-700' 
-                          : 'bg-gray-100 text-gray-700'
-                      }`}
+                      className={`px-3 py-1 rounded-full text-xs font-medium ${service.isActive
+                        ? 'bg-green-100 text-green-700'
+                        : 'bg-gray-100 text-gray-700'
+                        }`}
                     >
                       {service.isActive ? 'Active' : 'Inactive'}
                     </button>
@@ -463,9 +464,12 @@ const ManageServicesPage = () => {
                   </div>
 
                   <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">
-                      Service Features
-                    </label>
+                    <div className="flex items-center justify-between">
+                      <label className="block text-sm font-semibold text-gray-700 mb-2">
+                        Service Features
+                      </label>
+                      <button type="button" onClick={() => setShowIDGenerator(true)} className="text-sm px-3 py-1 bg-indigo-50 text-indigo-700 rounded-md">ID Card</button>
+                    </div>
                     <div className="space-y-3">
                       {formData.features.map((feature, index) => (
                         <div key={index} className="flex items-center space-x-3">
@@ -527,6 +531,19 @@ const ManageServicesPage = () => {
                     </PremiumButton>
                   </div>
                 </form>
+
+                {/* ID Card Generator Modal (opened from Service Features) */}
+                {showIDGenerator && (
+                  <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+                    <PremiumCard className="w-full max-w-3xl p-6">
+                      <div className="flex items-center justify-between mb-4">
+                        <h3 className="text-xl font-bold text-gray-900">ID Card Generator</h3>
+                        <button onClick={() => setShowIDGenerator(false)} className="text-gray-500 hover:text-gray-700">Close</button>
+                      </div>
+                      <IDCardGenerator />
+                    </PremiumCard>
+                  </div>
+                )}
               </div>
             </PremiumCard>
           </motion.div>

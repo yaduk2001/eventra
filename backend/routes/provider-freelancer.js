@@ -13,10 +13,13 @@ router.post('/jobs', verifyToken, checkRole(['event_company', 'caterer', 'transp
       category, 
       location, 
       hourlyRate, 
+      monthlyPay,
       duration, 
       requirements, 
       startDate, 
-      endDate 
+      endDate,
+      startHour,
+      endHour
     } = req.body;
 
     const jobData = {
@@ -26,10 +29,13 @@ router.post('/jobs', verifyToken, checkRole(['event_company', 'caterer', 'transp
       category,
       location,
       hourlyRate,
+      monthlyPay,
       duration,
       requirements: requirements || [],
       startDate,
       endDate,
+      startHour,
+      endHour,
       status: 'active',
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
@@ -69,6 +75,54 @@ router.get('/jobs', verifyToken, checkRole(['event_company', 'caterer', 'transpo
     res.status(500).json({
       success: false,
       message: 'Failed to get jobs',
+      error: error.message
+    });
+  }
+});
+
+// Delete a job (for service providers)
+router.delete('/jobs/:jobId', verifyToken, checkRole(['event_company', 'caterer', 'transport', 'photographer']), async (req, res) => {
+  try {
+    const { jobId } = req.params;
+    const providerId = req.user.uid;
+    
+    // Verify job exists and belongs to provider
+    const job = await firebaseHelpers.getDocument('job_postings', jobId);
+    if (!job) {
+      return res.status(404).json({
+        success: false,
+        message: 'Job not found'
+      });
+    }
+    
+    if (job.providerId !== providerId) {
+      return res.status(403).json({
+        success: false,
+        message: 'You can only delete your own jobs'
+      });
+    }
+    
+    // Delete the job
+    await firebaseHelpers.deleteDocument('job_postings', jobId);
+    
+    // Also delete all applications for this job
+    const allApplications = await firebaseHelpers.getCollection('job_applications') || [];
+    const jobApplications = allApplications.filter(app => app.jobId === jobId);
+    
+    // Delete each application
+    for (const application of jobApplications) {
+      await firebaseHelpers.deleteDocument('job_applications', application.id);
+    }
+    
+    res.json({
+      success: true,
+      message: 'Job and associated applications deleted successfully'
+    });
+  } catch (error) {
+    console.error('Error deleting job:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to delete job',
       error: error.message
     });
   }

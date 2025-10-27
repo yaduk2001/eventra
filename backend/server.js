@@ -7,6 +7,12 @@ const socketIo = require('socket.io');
 const rateLimit = require('express-rate-limit');
 require('dotenv').config();
 
+// Set OpenWeatherMap API key if not already set
+if (!process.env.OPENWEATHERMAP_API_KEY) {
+  process.env.OPENWEATHERMAP_API_KEY = '0eda69c968cd2fd1def2e50a202cc3fe';
+  console.log('Set OpenWeatherMap API key from code');
+}
+
 // Initialize Firebase
 const { firebaseApp, database, auth, firebaseHelpers } = require('./config/firebase');
 
@@ -40,9 +46,14 @@ app.use(limiter); // Rate limiting
 app.use(cors({
   origin: [
     process.env.FRONTEND_URL || "http://localhost:3000",
-    "http://localhost:3001"
+    "http://localhost:3001",
+    "http://127.0.0.1:3000",
+    "http://127.0.0.1:3001"
   ],
-  credentials: true
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+  optionsSuccessStatus: 200
 }));
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
@@ -61,13 +72,15 @@ const serviceRoutes = require('./routes/services');
 const freelancerRoutes = require('./routes/freelancer');
 const providerFreelancerRoutes = require('./routes/provider-freelancer');
 const staffJobsRoutes = require('./routes/staff-jobs');
+const weatherRoutes = require('./routes/weather');
+const emailRoutes = require('./routes/email');
 // const searchRoutes = require('./routes/search'); // MySQL routes - disabled
 
 // Firebase helpers already imported above
 
 // Routes
 app.get('/', (req, res) => {
-  res.json({ 
+  res.json({
     message: 'Eventrra Backend API is running!',
     version: '1.0.0',
     timestamp: new Date().toISOString(),
@@ -84,7 +97,7 @@ app.get('/', (req, res) => {
 
 // API Routes
 app.get('/api/health', (req, res) => {
-  res.json({ 
+  res.json({
     status: 'OK',
     message: 'Server is healthy',
     uptime: process.uptime(),
@@ -106,6 +119,8 @@ app.use('/api/services', serviceRoutes);
 app.use('/api/freelancer', freelancerRoutes);
 app.use('/api/provider-freelancer', providerFreelancerRoutes);
 app.use('/api/staff-jobs', staffJobsRoutes);
+app.use('/api', weatherRoutes);
+app.use('/api/email', emailRoutes);
 // app.use('/api/search', searchRoutes); // MySQL routes - disabled
 
 // Firebase-powered API endpoints
@@ -132,7 +147,7 @@ app.get('/api/events', async (req, res) => {
 app.post('/api/events', async (req, res) => {
   try {
     const { title, description, date, location, category } = req.body;
-    
+
     if (!title || !date) {
       return res.status(400).json({
         error: 'Missing required fields',
@@ -169,7 +184,7 @@ app.get('/api/events/:id', async (req, res) => {
   try {
     const { id } = req.params;
     const event = await firebaseHelpers.getDocument('events', id);
-    
+
     if (!event) {
       return res.status(404).json({
         error: 'Event not found',
@@ -201,7 +216,7 @@ app.put('/api/events/:id', async (req, res) => {
 
     await firebaseHelpers.updateDocument('events', id, updateData);
     const updatedEvent = await firebaseHelpers.getDocument('events', id);
-    
+
     res.json({
       message: 'Event updated successfully',
       data: updatedEvent
@@ -220,7 +235,7 @@ app.delete('/api/events/:id', async (req, res) => {
   try {
     const { id } = req.params;
     await firebaseHelpers.deleteDocument('events', id);
-    
+
     res.json({
       message: 'Event deleted successfully',
       data: { id }
@@ -249,7 +264,7 @@ app.get('/api/firebase/status', (req, res) => {
 app.get('/api/debug/users', async (req, res) => {
   try {
     const allUsers = await firebaseHelpers.getCollection('users');
-    
+
     const userSummary = allUsers.map(user => ({
       uid: user.uid,
       email: user.email,
@@ -259,12 +274,12 @@ app.get('/api/debug/users', async (req, res) => {
       businessName: user.businessName,
       registrationDate: user.registrationDate
     }));
-    
+
     const roleStats = {};
     allUsers.forEach(user => {
       roleStats[user.role] = (roleStats[user.role] || 0) + 1;
     });
-    
+
     res.json({
       message: 'Database users debug info',
       totalUsers: allUsers.length,
@@ -285,7 +300,7 @@ app.get('/api/debug/users', async (req, res) => {
 // Error handling middleware
 app.use((err, req, res, next) => {
   console.error(err.stack);
-  res.status(500).json({ 
+  res.status(500).json({
     error: 'Something went wrong!',
     message: process.env.NODE_ENV === 'development' ? err.message : 'Internal server error'
   });
@@ -293,7 +308,7 @@ app.use((err, req, res, next) => {
 
 // 404 handler
 app.use('*', (req, res) => {
-  res.status(404).json({ 
+  res.status(404).json({
     error: 'Route not found',
     path: req.originalUrl
   });
@@ -312,7 +327,7 @@ io.on('connection', (socket) => {
     socket.userId = userId;
     socket.join(`user-${userId}`);
     console.log(`User ${userId} joined their room`);
-    
+
     // Notify others that user is online
     socket.broadcast.emit('user-online', {
       userId,
@@ -452,7 +467,7 @@ io.on('connection', (socket) => {
 
   socket.on('disconnect', () => {
     console.log('User disconnected:', socket.id);
-    
+
     if (userId) {
       // Notify others that user is offline
       socket.broadcast.emit('user-offline', {

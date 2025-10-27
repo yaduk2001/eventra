@@ -27,6 +27,8 @@
     "react-intersection-observer": "^9.16.0",
     "socket.io-client": "^4.7.4",
     "three": "^0.180.0"
+    ,
+    "jspdf": "^2.5.1"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3",

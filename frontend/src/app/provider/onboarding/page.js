@@ -34,9 +34,26 @@ const ProviderOnboardingPage = () => {
       try {
         const debugResult = debugAuthFlow(user, userProfile, 'ProviderOnboarding');
         
+        // Check if user is actually a provider
+        const providerRoles = ['event_company', 'caterer', 'transport', 'photographer'];
+        const userRole = userProfile?.role || (typeof window !== 'undefined' ? localStorage.getItem('userRole') : null);
+        
+        // If user is not a provider, redirect them to their appropriate dashboard
+        if (user && userRole && !providerRoles.includes(userRole)) {
+          console.log('User is not a service provider, redirecting to appropriate dashboard');
+          const redirectPath = userRole === 'customer' ? '/customer/dashboard' : 
+                              userRole === 'freelancer' ? '/freelancer/dashboard' :
+                              userRole === 'jobseeker' ? '/jobseeker/dashboard' :
+                              userRole === 'admin' ? '/admin' : '/customer/dashboard';
+          toast.success('Redirecting to your dashboard...');
+          setTimeout(() => {
+            window.location.href = redirectPath;
+          }, 1000);
+          return;
+        }
+        
         // If user is authenticated and has a complete profile, redirect to dashboard
         if (user && userProfile && (userProfile.profileComplete || userProfile.completed)) {
-          const providerRoles = ['event_company', 'caterer', 'transport', 'photographer'];
           if (providerRoles.includes(userProfile.role)) {
             console.log('User has complete profile, redirecting to dashboard');
             toast.success('Profile already complete! Redirecting to dashboard...');
@@ -729,13 +746,16 @@ const ProviderOnboardingPage = () => {
       
       if (userRole && ['event_company', 'caterer', 'transport', 'photographer'].includes(userRole)) {
         console.log('User role in localStorage suggests service provider, extending wait time');
-        // Give more time for service providers as they might be coming from login redirect
+        // Give more time for service providers as they might be coming from registration
         timeoutId = setTimeout(() => {
           if (!user) {
             console.log('User still not authenticated after extended timeout, redirecting to login');
+            // Clear localStorage to prevent confusion
+            localStorage.removeItem('userRole');
+            localStorage.removeItem('registrationComplete');
             window.location.href = '/auth/login';
           }
-        }, 5000); // Extended to 5 seconds for service providers
+        }, 8000); // Extended to 8 seconds for service providers coming from registration
       } else {
         // Use shorter delay for others
         timeoutId = setTimeout(() => {
@@ -743,7 +763,7 @@ const ProviderOnboardingPage = () => {
             console.log('User still not authenticated after timeout, redirecting to login');
             window.location.href = '/auth/login';
           }
-        }, 2000);
+        }, 3000);
       }
     }
     

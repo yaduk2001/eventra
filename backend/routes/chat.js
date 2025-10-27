@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { firebaseHelpers } = require('../config/firebase');
-const { verifyToken } = require('../middleware/auth');
+const { verifyToken, checkRole } = require('../middleware/auth');
 
 // Chat message types
 const MESSAGE_TYPES = {
@@ -11,6 +11,54 @@ const MESSAGE_TYPES = {
   FILE: 'file',
   SYSTEM: 'system'
 };
+
+// Check if users can chat based on their roles
+async function checkChatPermissions(currentUserRole, participantRole, currentUserId, participantId) {
+  // Don't allow users to chat with themselves
+  if (currentUserId === participantId) {
+    return {
+      allowed: false,
+      reason: 'Cannot start a conversation with yourself'
+    };
+  }
+
+  // Define allowed chat combinations
+  const allowedCombinations = [
+    // Customers can chat with providers
+    { current: 'customer', participant: 'provider' },
+    { current: 'customer', participant: 'service_provider' },
+    
+    // Providers can chat with customers
+    { current: 'provider', participant: 'customer' },
+    { current: 'service_provider', participant: 'customer' },
+    
+    // Job seekers can chat with freelancers and vice versa
+    { current: 'job_seeker', participant: 'freelancer' },
+    { current: 'freelancer', participant: 'job_seeker' },
+    
+    // Admins can chat with anyone
+    { current: 'admin', participant: '*' },
+    { current: '*', participant: 'admin' }
+  ];
+
+  // Check if the combination is allowed
+  const isAllowed = allowedCombinations.some(combo => {
+    return (combo.current === currentUserRole || combo.current === '*') &&
+           (combo.participant === participantRole || combo.participant === '*');
+  });
+
+  if (!isAllowed) {
+    return {
+      allowed: false,
+      reason: `Users with role '${currentUserRole}' cannot chat with users with role '${participantRole}'`
+    };
+  }
+
+  return {
+    allowed: true,
+    reason: 'Chat allowed'
+  };
+}
 
 // Create or get chat room
 router.post('/room', verifyToken, async (req, res) => {
@@ -25,9 +73,47 @@ router.post('/room', verifyToken, async (req, res) => {
       });
     }
 
+    // Get current user details to check their role
+    const currentUser = await firebaseHelpers.getDocument('users', currentUserId);
+    if (!currentUser) {
+      return res.status(404).json({
+        error: 'Current user not found',
+        message: 'Your user profile does not exist'
+      });
+    }
+
+    const currentUserRole = currentUser.role;
+
+    // Get participant details to check their role
+    const participant = await firebaseHelpers.getDocument('users', participantId);
+    if (!participant) {
+      return res.status(404).json({
+        error: 'Participant not found',
+        message: 'The user you want to chat with does not exist'
+      });
+    }
+
+    const participantRole = participant.role;
+
+    // Check role-based permissions
+    const canChat = await checkChatPermissions(currentUserRole, participantRole, currentUserId, participantId);
+    if (!canChat.allowed) {
+      return res.status(403).json({
+        error: 'Chat not allowed',
+        message: canChat.reason
+      });
+    }
+
     // Create room ID (sorted to ensure consistency)
     const participants = [currentUserId, participantId].sort();
     const roomId = `room_${participants.join('_')}`;
+    
+    console.log('Creating chat room:', {
+      currentUserId,
+      participantId,
+      participants,
+      roomId
+    });
 
     // Check if room already exists
     const existingRoom = await firebaseHelpers.getDocument('chat_rooms', roomId);
@@ -36,6 +122,7 @@ router.post('/room', verifyToken, async (req, res) => {
       return res.json({
         success: true,
         data: {
+          id: roomId,
           roomId,
           participants: existingRoom.participants,
           createdAt: existingRoom.createdAt,
@@ -56,6 +143,11 @@ router.post('/room', verifyToken, async (req, res) => {
       unreadCount: {
         [currentUserId]: 0,
         [participantId]: 0
+      },
+      // Add role information for permission tracking
+      roles: {
+        [currentUserId]: currentUserRole,
+        [participantId]: participantRole
       }
     };
 
@@ -64,6 +156,7 @@ router.post('/room', verifyToken, async (req, res) => {
     res.status(201).json({
       success: true,
       data: {
+        id: roomId,
         roomId,
         participants: roomData.participants,
         createdAt: roomData.createdAt,
@@ -78,6 +171,78 @@ router.post('/room', verifyToken, async (req, res) => {
     });
   }
 });
+
+// Helper function to check chat permissions
+async function checkChatPermissions(currentUserRole, participantRole, currentUserId, participantId) {
+  // Admin can chat with anyone
+  if (currentUserRole === 'admin') {
+    return { allowed: true };
+  }
+
+  // Customer can only chat with service providers
+  if (currentUserRole === 'customer') {
+    if (['event_company', 'caterer', 'transport', 'photographer'].includes(participantRole)) {
+      return { allowed: true };
+    }
+    return { 
+      allowed: false, 
+      reason: 'Customers can only chat with service providers' 
+    };
+  }
+
+  // Service providers can chat with customers, job seekers and freelancers
+  if (['event_company', 'caterer', 'transport', 'photographer'].includes(currentUserRole)) {
+    if (['customer', 'job_seeker', 'freelancer'].includes(participantRole)) {
+      return { allowed: true };
+    }
+    return { 
+      allowed: false, 
+      reason: 'Service providers can only chat with customers, job seekers and freelancers' 
+    };
+  }
+
+  // Job seekers and freelancers can only reply to service providers
+  if (['job_seeker', 'freelancer'].includes(currentUserRole)) {
+    if (['event_company', 'caterer', 'transport', 'photographer'].includes(participantRole)) {
+      // Check if the service provider initiated the conversation
+      return await checkIfCanReply(currentUserId, participantId);
+    }
+    return { 
+      allowed: false, 
+      reason: 'You can only chat with service providers who have contacted you first' 
+    };
+  }
+
+  return { 
+    allowed: false, 
+    reason: 'Chat not allowed between these user types' 
+  };
+}
+
+// Helper function to check if user can reply (for job seekers/freelancers)
+async function checkIfCanReply(currentUserId, participantId) {
+  try {
+    // Check if there's an existing room where the participant initiated
+    const rooms = await firebaseHelpers.getChatRooms(currentUserId, {
+      createdBy: participantId
+    });
+
+    if (rooms && rooms.length > 0) {
+      return { allowed: true };
+    }
+
+    return { 
+      allowed: false, 
+      reason: 'You can only reply to messages from service providers who have contacted you first' 
+    };
+  } catch (error) {
+    console.error('Error checking reply permissions:', error);
+    return { 
+      allowed: false, 
+      reason: 'Unable to verify chat permissions' 
+    };
+  }
+}
 
 // Send message
 router.post('/message', verifyToken, async (req, res) => {
@@ -95,6 +260,14 @@ router.post('/message', verifyToken, async (req, res) => {
 
     // Verify user is participant in room
     const room = await firebaseHelpers.getDocument('chat_rooms', roomId);
+    console.log('Checking room access:', {
+      roomId,
+      senderId,
+      roomExists: !!room,
+      roomParticipants: room?.participants,
+      isParticipant: room?.participants?.includes(senderId)
+    });
+    
     if (!room || !room.participants.includes(senderId)) {
       return res.status(403).json({
         error: 'Access denied',
@@ -175,6 +348,14 @@ router.get('/room/:roomId/messages', verifyToken, async (req, res) => {
 
     // Verify user is participant
     const room = await firebaseHelpers.getDocument('chat_rooms', roomId);
+    console.log('Checking room access for messages:', {
+      roomId,
+      userId,
+      roomExists: !!room,
+      roomParticipants: room?.participants,
+      isParticipant: room?.participants?.includes(userId)
+    });
+    
     if (!room || !room.participants.includes(userId)) {
       return res.status(403).json({
         error: 'Access denied',
@@ -183,16 +364,16 @@ router.get('/room/:roomId/messages', verifyToken, async (req, res) => {
     }
 
     // Get messages with pagination
-    const messages = await firebaseHelpers.getCollection('chat_messages', {
-      where: [['roomId', '==', roomId]],
-      orderBy: [['timestamp', 'desc']],
+    const messages = await firebaseHelpers.getChatMessages(roomId, {
       limit: parseInt(limit),
       offset: (parseInt(page) - 1) * parseInt(limit)
     });
 
     // Mark messages as read
+    const updatedUnreadCount = { ...room.unreadCount };
+    updatedUnreadCount[userId] = 0;
     await firebaseHelpers.updateDocument('chat_rooms', roomId, {
-      [`unreadCount.${userId}`]: 0
+      unreadCount: updatedUnreadCount
     });
 
     res.json({
@@ -215,9 +396,7 @@ router.get('/rooms', verifyToken, async (req, res) => {
     const { page = 1, limit = 20 } = req.query;
 
     // Get rooms where user is participant
-    const rooms = await firebaseHelpers.getCollection('chat_rooms', {
-      where: [['participants', 'array-contains', userId]],
-      orderBy: [['updatedAt', 'desc']],
+    const rooms = await firebaseHelpers.getChatRooms(userId, {
       limit: parseInt(limit),
       offset: (parseInt(page) - 1) * parseInt(limit)
     });
@@ -265,9 +444,20 @@ router.patch('/room/:roomId/read', verifyToken, async (req, res) => {
     const { roomId } = req.params;
     const userId = req.user.uid;
 
+    // Get the room first to access current unreadCount
+    const room = await firebaseHelpers.getDocument('chat_rooms', roomId);
+    if (!room || !room.participants.includes(userId)) {
+      return res.status(403).json({
+        error: 'Access denied',
+        message: 'You are not a participant in this room'
+      });
+    }
+
     // Update unread count
+    const updatedUnreadCount = { ...room.unreadCount };
+    updatedUnreadCount[userId] = 0;
     await firebaseHelpers.updateDocument('chat_rooms', roomId, {
-      [`unreadCount.${userId}`]: 0
+      unreadCount: updatedUnreadCount
     });
 
     res.json({
@@ -299,6 +489,97 @@ router.post('/upload-media', verifyToken, async (req, res) => {
     console.error('Error uploading media:', error);
     res.status(500).json({
       error: 'Failed to upload media',
+      message: error.message
+    });
+  }
+});
+
+// Get available chat partners based on user role
+router.get('/available-partners', verifyToken, async (req, res) => {
+  try {
+    const currentUserId = req.user.uid;
+    const currentUserRole = req.user.role;
+
+    let availablePartners = [];
+
+    if (currentUserRole === 'admin') {
+      // Admin can chat with anyone
+      const allUsers = await firebaseHelpers.getCollection('users');
+      availablePartners = allUsers
+        .filter(user => user.uid !== currentUserId)
+        .map(user => ({
+          id: user.uid,
+          name: user.name || user.email,
+          email: user.email,
+          role: user.role,
+          picture: user.picture || null
+        }));
+    } else if (currentUserRole === 'customer') {
+      // Customer can only chat with service providers
+      const serviceProviders = await firebaseHelpers.getCollection('users', {
+        where: [['role', 'in', ['event_company', 'caterer', 'transport', 'photographer']]]
+      });
+      availablePartners = serviceProviders.map(provider => ({
+        id: provider.uid,
+        name: provider.businessName || provider.name || provider.email,
+        email: provider.email,
+        role: provider.role,
+        picture: provider.picture || null,
+        businessName: provider.businessName
+      }));
+    } else if (['event_company', 'caterer', 'transport', 'photographer'].includes(currentUserRole)) {
+      // Service providers can chat with customers, job seekers and freelancers
+      const customersAndPartners = await firebaseHelpers.getCollection('users', {
+        where: [['role', 'in', ['customer', 'jobseeker', 'freelancer']]]
+      });
+      availablePartners = customersAndPartners.map(user => ({
+        id: user.uid,
+        name: user.name || user.email,
+        email: user.email,
+        role: user.role,
+        picture: user.picture || null,
+        businessName: user.businessName
+      }));
+    } else if (['jobseeker', 'freelancer'].includes(currentUserRole)) {
+      // Job seekers and freelancers can only see service providers who have contacted them
+      const existingRooms = await firebaseHelpers.getChatRooms(currentUserId, {
+        createdByNot: currentUserId // Rooms created by others
+      });
+
+      const contactedByProviders = new Set();
+      existingRooms.forEach(room => {
+        const otherParticipants = room.participants.filter(id => id !== currentUserId);
+        otherParticipants.forEach(participantId => {
+          contactedByProviders.add(participantId);
+        });
+      });
+
+      // Get details of providers who have contacted this user
+      const providerDetails = await Promise.all(
+        Array.from(contactedByProviders).map(async (providerId) => {
+          const provider = await firebaseHelpers.getDocument('users', providerId);
+          return provider ? {
+            id: provider.uid,
+            name: provider.businessName || provider.name || provider.email,
+            email: provider.email,
+            role: provider.role,
+            picture: provider.picture || null,
+            businessName: provider.businessName
+          } : null;
+        })
+      );
+
+      availablePartners = providerDetails.filter(provider => provider !== null);
+    }
+
+    res.json({
+      success: true,
+      data: availablePartners
+    });
+  } catch (error) {
+    console.error('Error getting available partners:', error);
+    res.status(500).json({
+      error: 'Failed to get available partners',
       message: error.message
     });
   }

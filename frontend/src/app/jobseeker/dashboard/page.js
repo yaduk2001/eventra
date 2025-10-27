@@ -50,6 +50,7 @@ import {
 } from 'lucide-react';
 import PremiumButton from '../../../components/ui/PremiumButton';
 import PremiumCard from '../../../components/ui/PremiumCard';
+import EnhancedMessages from '../../../components/Messages/EnhancedMessages';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '../../../contexts/AuthContext';
@@ -848,52 +849,8 @@ const JobSeekerDashboard = () => {
   );
 
   const renderMessages = () => (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-bold text-gray-900">Messages</h2>
-        <PremiumButton variant="primary" size="sm">
-          <Plus className="w-4 h-4 mr-2" />
-          New Message
-        </PremiumButton>
-      </div>
-
-      {loadingMessages ? (
-        <div className="flex justify-center py-12">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600"></div>
-        </div>
-      ) : (
-        <div className="grid gap-4">
-          {realMessages.length === 0 ? (
-            <PremiumCard className="p-8 text-center">
-              <MessageCircle className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-              <h3 className="text-lg font-semibold text-gray-900 mb-2">No Messages</h3>
-              <p className="text-gray-600">You don't have any messages yet. Start a conversation with employers!</p>
-            </PremiumCard>
-          ) : (
-            realMessages.map((message) => (
-              <PremiumCard key={message.id} className="p-4">
-                <div className="flex items-start justify-between">
-                  <div className="flex items-center space-x-3">
-                    <div className="w-10 h-10 bg-indigo-100 rounded-full flex items-center justify-center">
-                      <Building className="w-5 h-5 text-indigo-600" />
-                    </div>
-                    <div>
-                      <h4 className="font-semibold text-gray-900">{message.sender || 'Unknown'}</h4>
-                      <p className="text-gray-600 text-sm">{message.lastMessage?.content || 'No messages yet'}</p>
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <span className="text-xs text-gray-500">{message.updatedAt ? new Date(message.updatedAt).toLocaleDateString() : ''}</span>
-                    {message.unreadCount && message.unreadCount > 0 && (
-                      <div className="w-2 h-2 bg-indigo-600 rounded-full mt-1 ml-auto"></div>
-                    )}
-                  </div>
-                </div>
-              </PremiumCard>
-            ))
-          )}
-        </div>
-      )}
+    <div className="h-[700px]">
+      <EnhancedMessages />
     </div>
   );
 

@@ -203,6 +203,38 @@ const ServiceProviderProfileInner = () => {
     ));
   };
 
+  const handleMessage = async () => {
+    try {
+      if (!user) {
+        router.push('/auth/login');
+        return;
+      }
+
+      if (!provider) {
+        console.error('No provider data available');
+        return;
+      }
+
+      const providerId = provider.id;
+
+      // Create or get existing chat room
+      const response = await api.chat.createOrGetRoom(providerId);
+      
+      if (response.success && response.data) {
+        const roomId = response.data.id;
+        // Navigate to customer messages page with specific room
+        router.push(`/customer/messages?room=${roomId}&partner=${providerId}`);
+      } else {
+        // Fallback: navigate to messages page
+        router.push('/customer/messages');
+      }
+    } catch (error) {
+      console.error('Error starting conversation:', error);
+      // Fallback: navigate to messages page
+      router.push('/customer/messages');
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100 flex items-center justify-center">
@@ -342,7 +374,7 @@ const ServiceProviderProfileInner = () => {
                     </div>
                     
                     <div className="flex space-x-3 mt-4 md:mt-0">
-                      <PremiumButton variant="primary">
+                      <PremiumButton variant="primary" onClick={handleMessage}>
                         <MessageCircle className="w-4 h-4 mr-2" />
                         Message
                       </PremiumButton>

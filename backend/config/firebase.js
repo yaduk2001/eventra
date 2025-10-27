@@ -114,16 +114,78 @@ const firebaseHelpers = {
   },
 
   // Get all documents from a collection
-  async getCollection(collection) {
+  async getCollection(collection, queryOptions = {}) {
     try {
       const snapshot = await database.ref(collection).once('value');
-      const documents = [];
+      let documents = [];
+      
       if (snapshot.exists()) {
         const data = snapshot.val();
         Object.keys(data).forEach(key => {
           documents.push({ id: key, ...data[key] });
         });
       }
+
+      // Apply client-side filtering for Realtime Database compatibility
+      if (queryOptions.where) {
+        queryOptions.where.forEach(([field, operator, value]) => {
+          documents = documents.filter(doc => {
+            switch (operator) {
+              case '==':
+                return doc[field] === value;
+              case '!=':
+                return doc[field] !== value;
+              case 'array-contains':
+                return Array.isArray(doc[field]) && doc[field].includes(value);
+              case '>':
+                return doc[field] > value;
+              case '<':
+                return doc[field] < value;
+              case '>=':
+                return doc[field] >= value;
+              case '<=':
+                return doc[field] <= value;
+              case 'in':
+                return Array.isArray(value) && value.includes(doc[field]);
+              case 'not-in':
+                return Array.isArray(value) && !value.includes(doc[field]);
+              default:
+                return true;
+            }
+          });
+        });
+      }
+
+      // Apply sorting
+      if (queryOptions.orderBy) {
+        queryOptions.orderBy.forEach(([field, direction = 'asc']) => {
+          documents.sort((a, b) => {
+            const aVal = a[field];
+            const bVal = b[field];
+            
+            if (aVal === bVal) return 0;
+            
+            if (direction === 'desc') {
+              return aVal > bVal ? -1 : 1;
+            } else {
+              return aVal > bVal ? 1 : -1;
+            }
+          });
+        });
+      }
+
+      // Apply pagination
+      if (queryOptions.offset || queryOptions.limit) {
+        const offset = queryOptions.offset || 0;
+        const limit = queryOptions.limit;
+        
+        if (limit) {
+          documents = documents.slice(offset, offset + limit);
+        } else {
+          documents = documents.slice(offset);
+        }
+      }
+
       return documents;
     } catch (error) {
       console.error('Error getting collection:', error);
@@ -160,6 +222,88 @@ const firebaseHelpers = {
       return decodedToken;
     } catch (error) {
       console.error('Error verifying ID token:', error);
+      throw error;
+    }
+  },
+
+  // Specialized helper for chat room queries with multiple conditions
+  async getChatRooms(userId, options = {}) {
+    try {
+      const snapshot = await database.ref('chat_rooms').once('value');
+      let rooms = [];
+      
+      if (snapshot.exists()) {
+        const data = snapshot.val();
+        Object.keys(data).forEach(key => {
+          const room = { id: key, ...data[key] };
+          // Filter rooms where user is a participant
+          if (Array.isArray(room.participants) && room.participants.includes(userId)) {
+            rooms.push(room);
+          }
+        });
+      }
+
+      // Apply additional filters
+      if (options.createdBy) {
+        rooms = rooms.filter(room => room.createdBy === options.createdBy);
+      }
+      
+      if (options.createdByNot) {
+        rooms = rooms.filter(room => room.createdBy !== options.createdByNot);
+      }
+
+      // Sort by updatedAt desc by default
+      rooms.sort((a, b) => {
+        const aTime = a.updatedAt || a.createdAt || 0;
+        const bTime = b.updatedAt || b.createdAt || 0;
+        return bTime - aTime;
+      });
+
+      // Apply pagination
+      if (options.limit) {
+        const offset = options.offset || 0;
+        rooms = rooms.slice(offset, offset + options.limit);
+      }
+
+      return rooms;
+    } catch (error) {
+      console.error('Error getting chat rooms:', error);
+      throw error;
+    }
+  },
+
+  // Specialized helper for chat messages
+  async getChatMessages(roomId, options = {}) {
+    try {
+      const snapshot = await database.ref('chat_messages').once('value');
+      let messages = [];
+      
+      if (snapshot.exists()) {
+        const data = snapshot.val();
+        Object.keys(data).forEach(key => {
+          const message = { id: key, ...data[key] };
+          if (message.roomId === roomId) {
+            messages.push(message);
+          }
+        });
+      }
+
+      // Sort by timestamp desc
+      messages.sort((a, b) => {
+        const aTime = a.timestamp || 0;
+        const bTime = b.timestamp || 0;
+        return bTime - aTime;
+      });
+
+      // Apply pagination
+      if (options.limit) {
+        const offset = options.offset || 0;
+        messages = messages.slice(offset, offset + options.limit);
+      }
+
+      return messages;
+    } catch (error) {
+      console.error('Error getting chat messages:', error);
       throw error;
     }
   },

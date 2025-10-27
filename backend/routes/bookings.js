@@ -9,14 +9,14 @@ router.post('/book-now', verifyToken, requireCustomer, async (req, res) => {
     console.log('Direct booking creation started');
     console.log('User:', req.user);
     console.log('Request body:', req.body);
-    
-    const { 
+
+    const {
       serviceId,
       providerId,
-      eventDate, 
-      location, 
-      budget, 
-      guestCount, 
+      eventDate,
+      location,
+      budget,
+      guestCount,
       requirements,
       eventName,
       eventType
@@ -62,7 +62,7 @@ router.post('/book-now', verifyToken, requireCustomer, async (req, res) => {
     // Collision validation: forbid if another active booking exists same date/time for this service/provider
     try {
       const allBookings = await firebaseHelpers.getCollection('bookings');
-      const normalizeTime = (t) => (t && t.length >= 4 ? t.slice(0,5) : '');
+      const normalizeTime = (t) => (t && t.length >= 4 ? t.slice(0, 5) : '');
       const desiredDate = eventDate;
       const desiredTime = normalizeTime(req.body.eventTime || '');
       const active = new Set(['pending', 'confirmed', 'in_progress']);
@@ -188,7 +188,7 @@ router.patch('/bookings/:bookingId/status', verifyToken, requireServiceProvider,
     await createNotification(booking.customerId, {
       type: status === 'accepted' ? 'booking_accepted' : 'booking_declined',
       title: status === 'accepted' ? 'Booking Confirmed!' : 'Booking Declined',
-      message: status === 'accepted' 
+      message: status === 'accepted'
         ? `Your booking for ${booking.eventName} has been confirmed by the provider.`
         : `Your booking for ${booking.eventName} has been declined by the provider.`,
       data: { bookingId, providerId: req.user.uid }
@@ -214,15 +214,15 @@ router.post('/bid-request', verifyToken, requireCustomer, async (req, res) => {
     console.log('User:', req.user);
     console.log('User role:', req.userRole);
     console.log('Request body:', req.body);
-    
-    const { 
+
+    const {
       eventName,
-      eventType, 
-      eventDate, 
-      location, 
-      budget, 
-      guestCount, 
-      requirements, 
+      eventType,
+      eventDate,
+      location,
+      budget,
+      guestCount,
+      requirements,
       servicesNeeded,
       preferredCategories,
       needWholeTeam
@@ -496,10 +496,10 @@ router.patch('/bid-request/:requestId/bid/:bidId', verifyToken, requireCustomer,
 router.get('/bid-requests', verifyToken, requireServiceProvider, async (req, res) => {
   try {
     const { status = 'open', page = 1, limit = 20 } = req.query;
-    
+
     // Get all bid requests and filter
     const allBidRequests = await firebaseHelpers.getCollection('bidRequests');
-    
+
     let bidRequests = allBidRequests.filter(request => {
       if (status && request.status !== status) return false;
       return true;
@@ -540,19 +540,19 @@ router.get('/bid-requests', verifyToken, requireServiceProvider, async (req, res
 router.get('/provider-bid-requests', verifyToken, requireServiceProvider, async (req, res) => {
   try {
     const { status, page = 1, limit = 20 } = req.query;
-    
+
     // Get all bid requests
     const allBidRequests = await firebaseHelpers.getCollection('bidRequests');
-    
+
     // Filter bid requests that are relevant to this provider or have bids from this provider
     let bidRequests = allBidRequests.filter(request => {
       // Include all open requests (potential opportunities)
       if (request.status === 'open') return true;
-      
+
       // Include requests where this provider has submitted a bid
       const providerBid = request.bids?.find(bid => bid.providerId === req.user.uid);
       if (providerBid) return true;
-      
+
       return false;
     });
 
@@ -601,10 +601,10 @@ router.get('/provider-bid-requests', verifyToken, requireServiceProvider, async 
 router.get('/my-bid-requests', verifyToken, requireCustomer, async (req, res) => {
   try {
     const { status, page = 1, limit = 20 } = req.query;
-    
+
     // Get all bid requests and filter by customer
     const allBidRequests = await firebaseHelpers.getCollection('bidRequests');
-    
+
     let bidRequests = allBidRequests.filter(request => {
       if (request.customerId !== req.user.uid) return false;
       if (status && request.status !== status) return false;
@@ -641,18 +641,18 @@ router.get('/bookings', verifyToken, async (req, res) => {
   try {
     const { status, page = 1, limit = 20 } = req.query;
     const { uid, role } = req.user;
-    
+
     // Get all bookings and filter
     const allBookings = await firebaseHelpers.getCollection('bookings');
-    
+
     let bookings = allBookings.filter(booking => {
       // Filter by user role
       if (role === 'customer' && booking.customerId !== uid) return false;
       if (role !== 'customer' && booking.providerId !== uid) return false;
-      
+
       // Filter by status if provided
       if (status && booking.status !== status) return false;
-      
+
       return true;
     });
 
@@ -686,7 +686,7 @@ router.patch('/bookings/:bookingId/status', verifyToken, async (req, res) => {
   try {
     const { bookingId } = req.params;
     const { status, notes } = req.body;
-    
+
     const validStatuses = ['confirmed', 'in_progress', 'completed', 'cancelled'];
     if (!validStatuses.includes(status)) {
       return res.status(400).json({
@@ -755,7 +755,7 @@ router.patch('/bookings/:bookingId/status', verifyToken, async (req, res) => {
 router.delete('/bid-request/:requestId', verifyToken, requireCustomer, async (req, res) => {
   try {
     const { requestId } = req.params;
-    
+
     // Get the bid request
     const bidRequest = await firebaseHelpers.getDocument('bidRequests', requestId);
     if (!bidRequest) {
@@ -775,10 +775,10 @@ router.delete('/bid-request/:requestId', verifyToken, requireCustomer, async (re
 
     // Check if bid request has any bids
     const hasBids = bidRequest.bids && bidRequest.bids.length > 0;
-    
+
     // If there are bids, check if any are accepted
     const hasAcceptedBids = hasBids && bidRequest.bids.some(bid => bid.status === 'accepted');
-    
+
     if (hasAcceptedBids) {
       return res.status(400).json({
         error: 'Cannot delete bid request',
@@ -819,7 +819,7 @@ router.delete('/bid-request/:requestId', verifyToken, requireCustomer, async (re
 async function notifyRelevantProviders(bidRequestData, requestId) {
   try {
     const { eventType, preferredCategories, servicesNeeded, needWholeTeam } = bidRequestData;
-    
+
     // Determine which provider types to notify based on needWholeTeam flag
     let targetRoles;
     if (needWholeTeam) {
@@ -829,7 +829,7 @@ async function notifyRelevantProviders(bidRequestData, requestId) {
       // Notify freelancers only
       targetRoles = ['freelancer'];
     }
-    
+
     // Get service providers that match the criteria
     let query = firebaseHelpers.firestore.collection('users')
       .where('approved', '==', true)
@@ -837,10 +837,10 @@ async function notifyRelevantProviders(bidRequestData, requestId) {
 
     const snapshot = await query.get();
     const providers = [];
-    
+
     snapshot.forEach(doc => {
       const provider = { id: doc.id, ...doc.data() };
-      
+
       // Check if provider matches the criteria
       if (needWholeTeam) {
         // For service providers, check if they handle this event type
@@ -880,9 +880,9 @@ async function notifyRelevantProviders(bidRequestData, requestId) {
       const docRef = firebaseHelpers.firestore.collection('notifications').doc();
       batch.set(docRef, notification);
     });
-    
+
     await batch.commit();
-    
+
     console.log(`Notified ${providers.length} ${notificationType} about new event request`);
   } catch (error) {
     console.error('Error notifying providers:', error);

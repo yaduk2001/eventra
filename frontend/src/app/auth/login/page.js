@@ -111,14 +111,14 @@ const LoginPage = () => {
 
         // Handle different error scenarios
         if (profileError.message.includes('404') || profileError.message.includes('not found')) {
-          console.log('Profile not found - new user needs to complete profile setup');
+          console.log('Profile not found - checking if user needs to complete profile setup');
           
           // For new users without profiles, we need to determine their intended role
-          // Check if they registered as a service provider by looking at the URL or localStorage
-          const intendedRole = localStorage.getItem('userRole') || 'customer';
+          // Check if they registered as a service provider by looking at localStorage
+          const intendedRole = localStorage.getItem('userRole');
           
-          if (['event_company', 'caterer', 'transport', 'photographer'].includes(intendedRole)) {
-            console.log('New service provider detected, redirecting to onboarding');
+          if (intendedRole && ['event_company', 'caterer', 'transport', 'photographer'].includes(intendedRole)) {
+            console.log('Service provider registration detected from localStorage, redirecting to onboarding');
             toast.success('Login successful! Please complete your service provider profile...');
             // Store role for onboarding page
             localStorage.setItem('userRole', intendedRole);
@@ -126,20 +126,60 @@ const LoginPage = () => {
               window.location.href = '/provider/onboarding';
             }, 500);
           } else {
-            console.log('New customer detected, redirecting to customer dashboard');
-            toast.success('Login successful! Setting up your account...');
-            setTimeout(() => {
-              window.location.href = '/customer/dashboard';
-            }, 500);
+            // No profile and not a provider - try to create a customer profile automatically
+            console.log('No profile found, attempting to create customer profile...');
+            try {
+              const profileData = {
+                name: user.displayName || user.email?.split('@')[0] || 'User',
+                email: user.email,
+                phone: '',
+                profileComplete: false,
+                registrationDate: new Date().toISOString(),
+                lastLogin: new Date().toISOString(),
+                isActive: true
+              };
+              
+              await api.createUserProfile('customer', profileData, user.uid, user.email, user.displayName, user.photoURL);
+              console.log('Customer profile created successfully');
+              toast.success('Login successful! Your account has been set up.');
+              setTimeout(() => {
+                window.location.href = '/customer/dashboard';
+              }, 500);
+            } catch (createError) {
+              console.error('Failed to create customer profile:', createError);
+              // Even if profile creation fails, redirect to customer dashboard
+              toast.success('Login successful! Redirecting...');
+              setTimeout(() => {
+                window.location.href = '/customer/dashboard';
+              }, 500);
+            }
           }
         } else if (profileError.message.includes('Unable to connect to server')) {
-          console.warn('Backend server unavailable, redirecting to customer dashboard');
-          toast.success('Login successful! (Server temporarily unavailable)');
-          window.location.href = '/customer/dashboard';
+          console.warn('Backend server unavailable, checking localStorage for role');
+          const intendedRole = localStorage.getItem('userRole') || 'customer';
+          
+          if (['event_company', 'caterer', 'transport', 'photographer'].includes(intendedRole)) {
+            toast.success('Login successful! (Server temporarily unavailable - redirecting to onboarding)');
+            setTimeout(() => {
+              window.location.href = '/provider/onboarding';
+            }, 500);
+          } else {
+            toast.success('Login successful! (Server temporarily unavailable)');
+            window.location.href = '/customer/dashboard';
+          }
         } else {
-          console.log('Profile fetch failed, redirecting to customer dashboard');
-          toast.success('Login successful! Redirecting...');
-          window.location.href = '/customer/dashboard';
+          console.log('Profile fetch failed, checking localStorage for role');
+          const intendedRole = localStorage.getItem('userRole') || 'customer';
+          
+          if (['event_company', 'caterer', 'transport', 'photographer'].includes(intendedRole)) {
+            toast.success('Login successful! Redirecting to onboarding...');
+            setTimeout(() => {
+              window.location.href = '/provider/onboarding';
+            }, 500);
+          } else {
+            toast.success('Login successful! Redirecting...');
+            window.location.href = '/customer/dashboard';
+          }
         }
       }
       
